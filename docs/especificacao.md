@@ -1,6 +1,6 @@
 # Especificação: mcp-enem (versão 1)
 
-Data: 08/10/2026 · Situação: aguardando revisão
+Data: 08/10/2026 · Situação: implementada (versão 0.1.0)
 
 ## Objetivo
 
@@ -222,8 +222,9 @@ O README dá crédito ao projeto enem.dev. As questões são do INEP.
 
 ## Pontos em aberto
 
-1. **Exibição de imagens**: o Claude recebe a imagem e consegue ler, mas é
-   preciso confirmar no primeiro teste manual se o aluno também a vê na
+1. **Exibição de imagens**: verificado em 08/10/2026, numa sessão real contra
+   a API, que o servidor anexa as imagens (PNG e JPEG) e manda o link no texto.
+   Falta confirmar, usando o Claude de verdade, se o aluno vê a imagem na
    conversa. Se não vir, o padrão de `apenas_texto` muda para `true`.
 2. **Nome no npm**: `mcp-enem` estava livre em 08/10/2026; confirmar de novo
    antes de publicar.

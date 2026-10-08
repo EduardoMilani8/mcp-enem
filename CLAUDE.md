@@ -10,6 +10,8 @@ Servidor MCP em TypeScript para estudar para o ENEM. Especificação em
 - Commits pequenos e separados, um por mudança lógica (um módulo com seus
   testes, uma correção, um ajuste de documentação). Nunca juntar assuntos
   diferentes no mesmo commit.
+- Trabalhar direto na branch `main`: commit e push nela, sem branches de
+  funcionalidade.
 - Nomes de domínio no código também em português (`questao`, `gabarito`,
   `historico`).
 - Nunca escrever no stdout: é o canal do protocolo MCP. Logs vão para o stderr.

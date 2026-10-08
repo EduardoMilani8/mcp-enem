@@ -130,6 +130,10 @@ Parâmetros: `ano`, `numero`, `resposta` (letra de A a E), `idioma` (opcional).
 Devolve se o aluno acertou, a alternativa correta e o texto dela. Grava a
 tentativa no histórico. É a única ferramenta que revela o gabarito.
 
+Nas questões de língua estrangeira o `idioma` é obrigatório: a mesma questão
+tem gabaritos diferentes em inglês e em espanhol, então sem ele a ferramenta
+devolve um erro pedindo o idioma em vez de adivinhar.
+
 ### `ver_desempenho`
 
 Parâmetros opcionais: `area`, `dias` (janela de tempo, padrão: tudo).
@@ -150,14 +154,17 @@ para refazer.
 
 1. A ferramenta valida os parâmetros.
 2. Se o ano não foi informado, sorteia um, dando preferência aos que já estão
-   em cache.
+   em cache. Se essa prova não tiver questões suficientes com os filtros, a
+   busca continua pelas outras (primeiro as já baixadas, depois até duas
+   novas) até completar a quantidade.
 3. `enem/` lê `cache/<ano>.json`. Se não existir, baixa o ano inteiro (4 páginas
    de 50, mais uma chamada para o segundo idioma), remove duplicatas por
    (ano, número, idioma) e grava.
 4. A ferramenta filtra por área, idioma, imagem e ineditismo, sorteia e remove
    o gabarito antes de responder.
-5. As imagens das questões escolhidas são baixadas, guardadas em cache e
-   anexadas à resposta; o link original também vai no texto.
+5. As imagens das questões escolhidas são baixadas em paralelo (só as 8
+   primeiras, com prazo único de 12 segundos), guardadas em cache e anexadas à
+   resposta até um teto de tamanho; o link original também vai no texto.
 
 **Corrigir resposta**
 
@@ -178,7 +185,10 @@ para refazer.
 | Parâmetro inválido | `zod` rejeita com mensagem em português |
 | Gabarito vazando | Tipo separado para "questão pública" sem o campo de gabarito; só `corrigir_resposta` acessa a versão completa |
 | Imagem quebrada ou alternativa vazia na origem | Questão marcada como `incompleta` e pulada no sorteio |
-| Muitas imagens numa resposta | No máximo 8 anexadas; as demais vão só como link |
+| Muitas imagens numa resposta | No máximo 8 tentadas e um teto de tamanho total; as demais vão só como link |
+| Servidor de imagens lento | Prazo único de 12 s para todas; as que não chegarem vão só como link |
+| Pedidos simultâneos do mesmo ano | Compartilham um único download |
+| Correção sem idioma em questão de língua estrangeira | Erro pedindo o idioma, sem gravar no histórico |
 | Prova sem o idioma pedido | As questões de língua estrangeira ficam de fora; nenhuma chamada inválida à API |
 | Falha ao baixar imagem | Questão vai só com o link e um aviso |
 | Questões 1 a 5 em dobro | Filtro por `idioma`; a chave da questão inclui o idioma |

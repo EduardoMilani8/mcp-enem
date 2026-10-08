@@ -7,6 +7,9 @@ Servidor MCP em TypeScript para estudar para o ENEM. Especificação em
 
 - Tudo em português: README, documentação, mensagens de commit, nomes e
   descrições das ferramentas MCP, mensagens de erro e comentários.
+- Commits pequenos e separados, um por mudança lógica (um módulo com seus
+  testes, uma correção, um ajuste de documentação). Nunca juntar assuntos
+  diferentes no mesmo commit.
 - Nomes de domínio no código também em português (`questao`, `gabarito`,
   `historico`).
 - Nunca escrever no stdout: é o canal do protocolo MCP. Logs vão para o stderr.

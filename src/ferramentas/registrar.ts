@@ -19,10 +19,17 @@ export interface Dependencias {
   imagens: CarregadorDeImagens;
   aleatorio?: () => number;
   agora?: () => Date;
+  /** Tempo máximo de espera por todas as imagens de uma resposta. */
+  prazoDasImagensMs?: number;
 }
 
-/** Acima disso a resposta fica grande demais para o modelo. */
+/** Quantas imagens, no máximo, o servidor tenta baixar e anexar por resposta. */
 export const MAXIMO_DE_IMAGENS_POR_RESPOSTA = 8;
+
+/** Soma máxima das imagens anexadas (em caracteres de base64, cerca de 2,2 MB). */
+export const TETO_DE_IMAGENS_EM_BASE64 = 3_000_000;
+
+const PRAZO_PADRAO_DAS_IMAGENS_MS = 12_000;
 
 /** Baixar uma prova leva uns 5 segundos; isto limita a espera de uma busca. */
 const MAXIMO_DE_PROVAS_NOVAS_POR_BUSCA = 2;
@@ -58,21 +65,42 @@ function enderecosDasImagens(questao: QuestaoPublica): string[] {
   return [...questao.imagens, ...questao.alternativas.flatMap((a) => (a.imagem ? [a.imagem] : []))];
 }
 
+/** Devolve o resultado da promessa, ou null se ela falhar ou passar do prazo. */
+function comPrazo<T>(promessa: Promise<T>, prazoMs: number): Promise<T | null> {
+  return new Promise((resolver) => {
+    const cronometro = setTimeout(() => resolver(null), prazoMs);
+    const encerrar = (valor: T | null) => {
+      clearTimeout(cronometro);
+      resolver(valor);
+    };
+    promessa.then(encerrar, () => encerrar(null));
+  });
+}
+
 async function montarQuestoes(
   questoes: QuestaoPublica[],
   imagens: CarregadorDeImagens,
   avisos: string[],
+  prazoDasImagensMs: number,
 ): Promise<CallToolResult> {
+  // Só as primeiras imagens são baixadas, todas ao mesmo tempo e com um prazo
+  // único: uma imagem lenta ou um servidor fora do ar não seguram as questões.
+  const tentadas = questoes.flatMap(enderecosDasImagens).slice(0, MAXIMO_DE_IMAGENS_POR_RESPOSTA);
+  const carregadas = await Promise.all(
+    tentadas.map((endereco) => comPrazo(imagens.carregar(endereco), prazoDasImagensMs)),
+  );
+
   const blocos: Bloco[] = [];
-  let anexadas = 0;
+  let posicao = 0;
+  let tamanhoAnexado = 0;
   let semAnexo = 0;
   for (const questao of questoes) {
     blocos.push({ type: "text", text: formatarQuestao(questao) });
-    for (const endereco of enderecosDasImagens(questao)) {
-      const imagem = anexadas < MAXIMO_DE_IMAGENS_POR_RESPOSTA ? await imagens.carregar(endereco) : null;
-      if (imagem) {
+    for (let i = 0; i < enderecosDasImagens(questao).length; i++) {
+      const imagem = carregadas[posicao++] ?? null;
+      if (imagem && tamanhoAnexado + imagem.dados.length <= TETO_DE_IMAGENS_EM_BASE64) {
         blocos.push({ type: "image", data: imagem.dados, mimeType: imagem.mimeType });
-        anexadas++;
+        tamanhoAnexado += imagem.dados.length;
       } else {
         semAnexo++;
       }
@@ -88,6 +116,7 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
   const { repositorio, historico, imagens } = dependencias;
   const aleatorio = dependencias.aleatorio ?? Math.random;
   const agora = dependencias.agora ?? (() => new Date());
+  const prazoDasImagensMs = dependencias.prazoDasImagensMs ?? PRAZO_PADRAO_DAS_IMAGENS_MS;
 
   servidor.registerTool(
     "listar_provas",
@@ -140,7 +169,7 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
           if (escolhidas.length < quantidade) {
             avisos.push(`Só havia ${escolhidas.length} de ${quantidade} questões com esses filtros no ENEM ${ano}.`);
           }
-          return montarQuestoes(escolhidas.map(paraPublica), imagens, avisos);
+          return montarQuestoes(escolhidas.map(paraPublica), imagens, avisos, prazoDasImagensMs);
         }
 
         // Sem ano: começa por uma prova e, se ela não tiver questões suficientes,
@@ -192,7 +221,7 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
           );
         }
         escolhidas.sort((a, b) => a.ano - b.ano || a.numero - b.numero);
-        return montarQuestoes(escolhidas.map(paraPublica), imagens, avisos);
+        return montarQuestoes(escolhidas.map(paraPublica), imagens, avisos, prazoDasImagensMs);
       }),
   );
 
@@ -207,7 +236,7 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
     async ({ ano, numero, idioma }) =>
       protegido(async () => {
         const questao = await repositorio.obterQuestao(ano, numero, idioma);
-        return montarQuestoes([paraPublica(questao)], imagens, []);
+        return montarQuestoes([paraPublica(questao)], imagens, [], prazoDasImagensMs);
       }),
   );
 
@@ -313,7 +342,7 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
           }
         }
         if (questoes.length === 0) return texto("Nenhum erro pendente para rever.");
-        return montarQuestoes(questoes, imagens, []);
+        return montarQuestoes(questoes, imagens, [], prazoDasImagensMs);
       }),
   );
 }

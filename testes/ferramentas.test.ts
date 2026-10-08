@@ -15,6 +15,7 @@ const VAZAMENTO = /gabarito|correctAlternative|isCorrect/i;
 interface OpcoesDeMontagem {
   aleatorio?: () => number;
   buscarImagem?: typeof fetch;
+  prazoDasImagensMs?: number;
 }
 
 async function montar(opcoes: OpcoesDeMontagem = {}) {
@@ -41,6 +42,7 @@ async function montar(opcoes: OpcoesDeMontagem = {}) {
     }),
     agora: () => new Date("2026-10-08T12:00:00.000Z"),
     aleatorio: opcoes.aleatorio,
+    prazoDasImagensMs: opcoes.prazoDasImagensMs,
   });
   const [ladoDoServidor, ladoDoCliente] = InMemoryTransport.createLinkedPair();
   await servidor.connect(ladoDoServidor);
@@ -299,4 +301,41 @@ test("sem ano, junta questões de mais de uma prova para completar a quantidade"
   expect(numerosDe(resultado)).toHaveLength(5);
   expect(textoDe(resultado).match(/ENEM 2023 · Questão/g)).toHaveLength(3);
   expect(textoDe(resultado).match(/ENEM 2022 · Questão/g)).toHaveLength(2);
+});
+
+test("com o servidor de imagens fora do ar, tenta no máximo 8 downloads", async () => {
+  let tentativas = 0;
+  const { chamar } = await montar({
+    buscarImagem: async () => {
+      tentativas++;
+      return new Response("", { status: 404 });
+    },
+  });
+  const resultado = await chamar("buscar_questoes", { quantidade: 20, ano: 2022, area: "matematica" });
+  expect(numerosDe(resultado)).toHaveLength(20);
+  expect(resultado.content.some((bloco) => bloco.type === "image")).toBe(false);
+  expect(tentativas).toBeLessThanOrEqual(8);
+  expect(textoDe(resultado)).toContain("20 imagem(ns)");
+});
+
+test("imagem que demora demais não segura a resposta", async () => {
+  const { chamar } = await montar({
+    buscarImagem: () => new Promise<Response>(() => {}),
+    prazoDasImagensMs: 30,
+  });
+  const resultado = await chamar("buscar_questoes", { quantidade: 3, ano: 2022, area: "matematica" });
+  expect(numerosDe(resultado)).toHaveLength(3);
+  expect(resultado.content.some((bloco) => bloco.type === "image")).toBe(false);
+  expect(textoDe(resultado)).toContain("https://enem.dev/2022/figura.png");
+}, 2000);
+
+test("o total de imagens anexadas respeita um teto de tamanho", async () => {
+  const grande = new Uint8Array(600_000).fill(7);
+  const { chamar } = await montar({ buscarImagem: async () => new Response(grande) });
+  const resultado = await chamar("buscar_questoes", { quantidade: 8, ano: 2022, area: "matematica" });
+  expect(numerosDe(resultado)).toHaveLength(8);
+  const anexadas = resultado.content.flatMap((bloco) => (bloco.type === "image" ? [bloco.data.length] : []));
+  expect(anexadas.length).toBeGreaterThan(0);
+  expect(anexadas.reduce((soma, tamanho) => soma + tamanho, 0)).toBeLessThanOrEqual(3_000_000);
+  expect(textoDe(resultado)).toContain("imagem(ns) não foram anexadas");
 });

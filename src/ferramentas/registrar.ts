@@ -1,0 +1,264 @@
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
+import type { CarregadorDeImagens } from "../enem/imagens.js";
+import type { RepositorioEnem } from "../enem/repositorio.js";
+import { AREAS, ErroEnem, IDIOMAS, LETRAS, paraPublica, type Questao, type QuestaoPublica } from "../enem/tipos.js";
+import { calcularDesempenho, chavesRespondidas, errosPendentes } from "../historico/estatisticas.js";
+import type { Historico } from "../historico/historico.js";
+import { log } from "../log.js";
+import { formatarDesempenho, formatarQuestao } from "./formatar.js";
+import { escolherAno, filtrar, sortear } from "./sorteio.js";
+
+// Mensagens de validação do zod em português.
+z.config(z.locales.pt());
+
+export interface Dependencias {
+  repositorio: RepositorioEnem;
+  historico: Historico;
+  imagens: CarregadorDeImagens;
+  aleatorio?: () => number;
+  agora?: () => Date;
+}
+
+/** Acima disso a resposta fica grande demais para o modelo. */
+export const MAXIMO_DE_IMAGENS_POR_RESPOSTA = 8;
+
+type Bloco = CallToolResult["content"][number];
+
+const campoAno = z.number().int().min(2009).describe("Ano da prova, por exemplo 2023.");
+const campoNumero = z.number().int().min(1).max(200).describe("Número da questão na prova.");
+const campoArea = z.enum(AREAS).describe("Área do conhecimento.");
+const campoIdioma = z
+  .enum(IDIOMAS)
+  .describe("Idioma das questões de língua estrangeira. Só afeta essas questões.");
+
+function texto(mensagem: string): CallToolResult {
+  return { content: [{ type: "text", text: mensagem }] };
+}
+
+function falha(mensagem: string): CallToolResult {
+  return { isError: true, content: [{ type: "text", text: mensagem }] };
+}
+
+async function protegido(acao: () => Promise<CallToolResult>): Promise<CallToolResult> {
+  try {
+    return await acao();
+  } catch (erro) {
+    if (erro instanceof ErroEnem) return falha(erro.message);
+    log("erro inesperado:", erro);
+    return falha("Ocorreu um erro inesperado no mcp-enem. Tente de novo.");
+  }
+}
+
+function enderecosDasImagens(questao: QuestaoPublica): string[] {
+  return [...questao.imagens, ...questao.alternativas.flatMap((a) => (a.imagem ? [a.imagem] : []))];
+}
+
+async function montarQuestoes(
+  questoes: QuestaoPublica[],
+  imagens: CarregadorDeImagens,
+  avisos: string[],
+): Promise<CallToolResult> {
+  const blocos: Bloco[] = [];
+  let anexadas = 0;
+  let semAnexo = 0;
+  for (const questao of questoes) {
+    blocos.push({ type: "text", text: formatarQuestao(questao) });
+    for (const endereco of enderecosDasImagens(questao)) {
+      const imagem = anexadas < MAXIMO_DE_IMAGENS_POR_RESPOSTA ? await imagens.carregar(endereco) : null;
+      if (imagem) {
+        blocos.push({ type: "image", data: imagem.dados, mimeType: imagem.mimeType });
+        anexadas++;
+      } else {
+        semAnexo++;
+      }
+    }
+  }
+  const todos = [...avisos];
+  if (semAnexo > 0) todos.push(`${semAnexo} imagem(ns) não foram anexadas; use os links no texto da questão.`);
+  if (todos.length > 0) blocos.push({ type: "text", text: `Avisos:\n${todos.map((a) => `- ${a}`).join("\n")}` });
+  return { content: blocos };
+}
+
+export function registrarFerramentas(servidor: McpServer, dependencias: Dependencias): void {
+  const { repositorio, historico, imagens } = dependencias;
+  const aleatorio = dependencias.aleatorio ?? Math.random;
+  const agora = dependencias.agora ?? (() => new Date());
+
+  servidor.registerTool(
+    "listar_provas",
+    { description: "Lista os anos de prova do ENEM disponíveis, as áreas do conhecimento e os idiomas." },
+    async () =>
+      protegido(async () => {
+        const provas = await repositorio.listarProvas();
+        const anos = provas.map((p) => p.ano);
+        return texto(
+          [
+            `Provas disponíveis: ${anos.join(", ")}.`,
+            `Áreas (parâmetro "area"): ${AREAS.join(", ")}.`,
+            `Idiomas das questões de língua estrangeira (parâmetro "idioma"): ${IDIOMAS.join(", ")}.`,
+          ].join("\n"),
+        );
+      }),
+  );
+
+  servidor.registerTool(
+    "buscar_questoes",
+    {
+      description:
+        "Sorteia questões oficiais do ENEM para o aluno responder. A resposta certa NÃO é devolvida: " +
+        "depois que o aluno responder, use corrigir_resposta. Apresente uma questão por vez.",
+      inputSchema: {
+        quantidade: z.number().int().min(1).max(20).default(5).describe("Quantas questões sortear (1 a 20)."),
+        area: campoArea.optional(),
+        ano: campoAno.optional().describe("Ano da prova. Se omitido, um ano é sorteado."),
+        idioma: campoIdioma.default("ingles"),
+        apenas_texto: z.boolean().default(false).describe("Se verdadeiro, pula questões que têm imagem."),
+        ineditas: z.boolean().default(true).describe("Se verdadeiro, evita questões que o aluno já respondeu."),
+      },
+    },
+    async ({ quantidade, area, ano, idioma, apenas_texto, ineditas }) =>
+      protegido(async () => {
+        const avisos: string[] = [];
+        const excluir = ineditas ? chavesRespondidas(await historico.ler()) : new Set<string>();
+
+        let anoEscolhido: number;
+        let questoes: Questao[];
+        if (ano !== undefined) {
+          anoEscolhido = ano;
+          questoes = await repositorio.questoesDoAno(anoEscolhido);
+        } else {
+          const emCache = await repositorio.anosEmCache();
+          anoEscolhido = escolherAno(await repositorio.anosDisponiveis(), emCache, aleatorio);
+          try {
+            questoes = await repositorio.questoesDoAno(anoEscolhido);
+          } catch (erro) {
+            // Sem rede para baixar um ano novo: usa um que já esteja em cache.
+            const reserva = sortear(emCache, 1, aleatorio)[0];
+            if (!(erro instanceof ErroEnem) || erro.codigo === "nao_encontrado" || reserva === undefined) throw erro;
+            anoEscolhido = reserva;
+            questoes = await repositorio.questoesDoAno(anoEscolhido);
+            avisos.push("Não consegui baixar uma prova nova; usei uma que já estava guardada.");
+          }
+        }
+
+        const candidatas = filtrar(questoes, { area, idioma, apenasTexto: apenas_texto, excluir });
+        const escolhidas = sortear(candidatas, quantidade, aleatorio).sort((a, b) => a.numero - b.numero);
+        if (escolhidas.length === 0) {
+          return texto(
+            `Não há questões do ENEM ${anoEscolhido} com esses filtros. ` +
+              "Tente outro ano ou outra área, ou use ineditas=false para repetir questões já respondidas.",
+          );
+        }
+        if (escolhidas.length < quantidade) {
+          avisos.push(`Só havia ${escolhidas.length} de ${quantidade} questões com esses filtros no ENEM ${anoEscolhido}.`);
+        }
+        return montarQuestoes(escolhidas.map(paraPublica), imagens, avisos);
+      }),
+  );
+
+  servidor.registerTool(
+    "obter_questao",
+    {
+      description:
+        "Devolve uma questão específica do ENEM pelo ano e número, sem a resposta certa. " +
+        "Use corrigir_resposta depois que o aluno responder.",
+      inputSchema: { ano: campoAno, numero: campoNumero, idioma: campoIdioma.optional() },
+    },
+    async ({ ano, numero, idioma }) =>
+      protegido(async () => {
+        const questao = await repositorio.obterQuestao(ano, numero, idioma);
+        return montarQuestoes([paraPublica(questao)], imagens, []);
+      }),
+  );
+
+  servidor.registerTool(
+    "corrigir_resposta",
+    {
+      description:
+        "Confere a resposta do aluno com o gabarito oficial, revela a alternativa correta e registra a " +
+        "tentativa no histórico. Chame só depois que o aluno tiver escolhido uma alternativa.",
+      inputSchema: {
+        ano: campoAno,
+        numero: campoNumero,
+        resposta: z
+          .enum(["A", "B", "C", "D", "E", "a", "b", "c", "d", "e"])
+          .describe("A alternativa que o aluno escolheu, de A a E."),
+        idioma: campoIdioma.optional(),
+      },
+    },
+    async ({ ano, numero, resposta, idioma }) =>
+      protegido(async () => {
+        const questao = await repositorio.obterQuestao(ano, numero, idioma);
+        const marcada = LETRAS.find((letra) => letra === resposta.toUpperCase());
+        if (!marcada) return falha("A resposta deve ser uma letra de A a E.");
+        const acertou = marcada === questao.gabarito;
+        await historico.registrar({
+          quando: agora().toISOString(),
+          ano: questao.ano,
+          numero: questao.numero,
+          idioma: questao.idioma,
+          area: questao.area,
+          resposta: marcada,
+          correta: questao.gabarito,
+          acertou,
+        });
+        const correta = questao.alternativas.find((a) => a.letra === questao.gabarito);
+        const gabarito = `${questao.gabarito}) ${correta?.texto ?? "(alternativa em imagem)"}`;
+        return texto(
+          acertou
+            ? `Resposta correta. Gabarito oficial: ${gabarito}`
+            : `Resposta incorreta. O aluno marcou ${marcada}. Gabarito oficial: ${gabarito}`,
+        );
+      }),
+  );
+
+  servidor.registerTool(
+    "ver_desempenho",
+    {
+      description: "Mostra os acertos e erros do aluno, no geral, nos últimos 7 dias e por área do conhecimento.",
+      inputSchema: {
+        area: campoArea.optional(),
+        dias: z.number().int().min(1).max(3650).optional().describe("Considera só os últimos N dias."),
+      },
+    },
+    async ({ area, dias }) =>
+      protegido(async () => {
+        const tentativas = await historico.ler();
+        if (tentativas.length === 0) {
+          return texto("O aluno ainda não respondeu nenhuma questão. Use buscar_questoes para começar.");
+        }
+        return texto(formatarDesempenho(calcularDesempenho(tentativas, { area, dias, agora: agora() })));
+      }),
+  );
+
+  servidor.registerTool(
+    "revisar_erros",
+    {
+      description:
+        "Devolve questões que o aluno errou e ainda precisa rever, sem a resposta certa, para ele tentar de novo. " +
+        "Use corrigir_resposta depois que ele responder.",
+      inputSchema: {
+        quantidade: z.number().int().min(1).max(20).default(5).describe("Quantas questões devolver (1 a 20)."),
+        area: campoArea.optional(),
+      },
+    },
+    async ({ quantidade, area }) =>
+      protegido(async () => {
+        const pendentes = errosPendentes(await historico.ler()).filter((t) => area === undefined || t.area === area);
+        const questoes: QuestaoPublica[] = [];
+        for (const pendente of pendentes.slice(0, quantidade)) {
+          try {
+            const questao = await repositorio.obterQuestao(pendente.ano, pendente.numero, pendente.idioma ?? undefined);
+            questoes.push(paraPublica(questao));
+          } catch (erro) {
+            if (!(erro instanceof ErroEnem)) throw erro;
+            log(`não consegui recarregar a questão ${pendente.numero} de ${pendente.ano}: ${erro.message}`);
+          }
+        }
+        if (questoes.length === 0) return texto("Nenhum erro pendente para rever.");
+        return montarQuestoes(questoes, imagens, []);
+      }),
+  );
+}

@@ -105,3 +105,36 @@ test("cache corrompido ou vazio é baixado de novo", async () => {
   expect(await repositorio.questoesDoAno(2023)).toHaveLength(184);
   expect(await repositorio.questoesDoAno(2022)).toHaveLength(184);
 });
+
+test("pedidos simultâneos do mesmo ano fazem um único download", async () => {
+  const api = apiPadrao();
+  const pasta = await pastaTemporaria();
+  const sozinho = new RepositorioEnem(new ClienteApi({ buscar: api.buscar, intervaloMs: 0 }), pasta);
+  await sozinho.questoesDoAno(2023);
+  const chamadasDeUmDownload = api.chamadas.length;
+
+  const outraApi = apiPadrao();
+  const repositorio = new RepositorioEnem(new ClienteApi({ buscar: outraApi.buscar, intervaloMs: 0 }), await pastaTemporaria());
+  const resultados = await Promise.all([
+    repositorio.questoesDoAno(2023),
+    repositorio.questoesDoAno(2023),
+    repositorio.obterQuestao(2023, 140),
+  ]);
+  expect(resultados[0]).toHaveLength(184);
+  expect(resultados[1]).toHaveLength(184);
+  expect(resultados[2].numero).toBe(140);
+  expect(outraApi.chamadas.length).toBe(chamadasDeUmDownload);
+});
+
+test("um download que falha não fica preso: a tentativa seguinte funciona", async () => {
+  const api = apiPadrao();
+  let falhar = true;
+  const buscar: typeof fetch = async (entrada, init) => {
+    if (falhar) throw new TypeError("fetch failed");
+    return api.buscar(entrada, init);
+  };
+  const repositorio = new RepositorioEnem(new ClienteApi({ buscar, intervaloMs: 0 }), await pastaTemporaria());
+  await expect(repositorio.questoesDoAno(2023)).rejects.toMatchObject({ codigo: "indisponivel" });
+  falhar = false;
+  expect(await repositorio.questoesDoAno(2023)).toHaveLength(184);
+});

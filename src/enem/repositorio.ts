@@ -21,6 +21,9 @@ export class RepositorioEnem {
   private readonly pasta: string;
   private readonly agora: () => number;
   private readonly anosNaMemoria = new Map<number, Questao[]>();
+  // Pedidos simultâneos da mesma coisa compartilham um único download.
+  private readonly anosEmAndamento = new Map<number, Promise<Questao[]>>();
+  private provasEmAndamento: Promise<Prova[]> | null = null;
 
   constructor(fonte: FonteDeDados, pasta: string, agora: () => number = Date.now) {
     this.fonte = fonte;
@@ -28,7 +31,14 @@ export class RepositorioEnem {
     this.agora = agora;
   }
 
-  async listarProvas(): Promise<Prova[]> {
+  listarProvas(): Promise<Prova[]> {
+    this.provasEmAndamento ??= this.carregarProvas().finally(() => {
+      this.provasEmAndamento = null;
+    });
+    return this.provasEmAndamento;
+  }
+
+  private async carregarProvas(): Promise<Prova[]> {
     const caminho = join(this.pasta, "provas.json");
     const guardado = await lerJson<ProvasGuardadas>(caminho);
     const provasGuardadas =
@@ -78,6 +88,15 @@ export class RepositorioEnem {
     const naMemoria = this.anosNaMemoria.get(ano);
     if (naMemoria) return naMemoria;
 
+    let emAndamento = this.anosEmAndamento.get(ano);
+    if (!emAndamento) {
+      emAndamento = this.carregarAno(ano).finally(() => this.anosEmAndamento.delete(ano));
+      this.anosEmAndamento.set(ano, emAndamento);
+    }
+    return emAndamento;
+  }
+
+  private async carregarAno(ano: number): Promise<Questao[]> {
     const caminho = join(this.pasta, `${ano}.json`);
     const guardadas = await lerJson<Questao[]>(caminho);
     if (Array.isArray(guardadas) && guardadas.length > 0) {

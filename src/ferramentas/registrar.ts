@@ -24,6 +24,9 @@ export interface Dependencias {
 /** Acima disso a resposta fica grande demais para o modelo. */
 export const MAXIMO_DE_IMAGENS_POR_RESPOSTA = 8;
 
+/** Baixar uma prova leva uns 5 segundos; isto limita a espera de uma busca. */
+const MAXIMO_DE_PROVAS_NOVAS_POR_BUSCA = 2;
+
 type Bloco = CallToolResult["content"][number];
 
 const campoAno = z.number().int().min(2009).describe("Ano da prova, por exemplo 2023.");
@@ -123,37 +126,72 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
         const avisos: string[] = [];
         const excluir = ineditas ? chavesRespondidas(await historico.ler()) : new Set<string>();
 
-        let anoEscolhido: number;
-        let questoes: Questao[];
+        const filtro = { area, idioma, apenasTexto: apenas_texto, excluir };
+
         if (ano !== undefined) {
-          anoEscolhido = ano;
-          questoes = await repositorio.questoesDoAno(anoEscolhido);
-        } else {
-          const emCache = await repositorio.anosEmCache();
-          anoEscolhido = escolherAno(await repositorio.anosDisponiveis(), emCache, aleatorio);
-          try {
-            questoes = await repositorio.questoesDoAno(anoEscolhido);
-          } catch (erro) {
-            // Sem rede para baixar um ano novo: usa um que já esteja em cache.
-            const reserva = sortear(emCache, 1, aleatorio)[0];
-            if (!(erro instanceof ErroEnem) || erro.codigo === "nao_encontrado" || reserva === undefined) throw erro;
-            anoEscolhido = reserva;
-            questoes = await repositorio.questoesDoAno(anoEscolhido);
-            avisos.push("Não consegui baixar uma prova nova; usei uma que já estava guardada.");
+          const candidatas = filtrar(await repositorio.questoesDoAno(ano), filtro);
+          const escolhidas = sortear(candidatas, quantidade, aleatorio).sort((a, b) => a.numero - b.numero);
+          if (escolhidas.length === 0) {
+            return texto(
+              `Não há questões do ENEM ${ano} com esses filtros. ` +
+                "Tente outro ano ou outra área, ou use ineditas=false para repetir questões já respondidas.",
+            );
           }
+          if (escolhidas.length < quantidade) {
+            avisos.push(`Só havia ${escolhidas.length} de ${quantidade} questões com esses filtros no ENEM ${ano}.`);
+          }
+          return montarQuestoes(escolhidas.map(paraPublica), imagens, avisos);
         }
 
-        const candidatas = filtrar(questoes, { area, idioma, apenasTexto: apenas_texto, excluir });
-        const escolhidas = sortear(candidatas, quantidade, aleatorio).sort((a, b) => a.numero - b.numero);
+        // Sem ano: começa por uma prova e, se ela não tiver questões suficientes,
+        // completa com as outras (primeiro as já baixadas, depois as novas).
+        const disponiveis = await repositorio.anosDisponiveis();
+        const emCache = await repositorio.anosEmCache();
+        const primeiro = escolherAno(disponiveis, emCache, aleatorio);
+        const outros = disponiveis.filter((a) => a !== primeiro);
+        const fila = [
+          primeiro,
+          ...sortear(outros.filter((a) => emCache.includes(a)), outros.length, aleatorio),
+          ...sortear(outros.filter((a) => !emCache.includes(a)), outros.length, aleatorio),
+        ];
+
+        const escolhidas: Questao[] = [];
+        const consultados: number[] = [];
+        let provasNovas = 0;
+        let falhaDeRede: ErroEnem | null = null;
+        for (const anoDaVez of fila) {
+          if (escolhidas.length >= quantidade) break;
+          const nova = !emCache.includes(anoDaVez);
+          // Cada prova nova custa um download; e sem rede não adianta tentar outra.
+          if (nova && (falhaDeRede !== null || provasNovas >= MAXIMO_DE_PROVAS_NOVAS_POR_BUSCA)) continue;
+          let questoes: Questao[];
+          try {
+            questoes = await repositorio.questoesDoAno(anoDaVez);
+          } catch (erro) {
+            if (!(erro instanceof ErroEnem) || erro.codigo === "nao_encontrado") throw erro;
+            falhaDeRede = erro;
+            continue;
+          }
+          if (nova) provasNovas++;
+          consultados.push(anoDaVez);
+          escolhidas.push(...sortear(filtrar(questoes, filtro), quantidade - escolhidas.length, aleatorio));
+        }
+
+        if (consultados.length === 0 && falhaDeRede) throw falhaDeRede;
+        if (falhaDeRede) avisos.push("Não consegui baixar uma prova nova; usei as que já estavam guardadas.");
+        const provas = [...consultados].sort((a, b) => a - b).join(", ");
         if (escolhidas.length === 0) {
           return texto(
-            `Não há questões do ENEM ${anoEscolhido} com esses filtros. ` +
-              "Tente outro ano ou outra área, ou use ineditas=false para repetir questões já respondidas.",
+            `Não há questões com esses filtros nas provas consultadas (${provas}). ` +
+              "Tente outra área, informe um ano específico, ou use ineditas=false para repetir questões já respondidas.",
           );
         }
         if (escolhidas.length < quantidade) {
-          avisos.push(`Só havia ${escolhidas.length} de ${quantidade} questões com esses filtros no ENEM ${anoEscolhido}.`);
+          avisos.push(
+            `Só havia ${escolhidas.length} de ${quantidade} questões com esses filtros nas provas consultadas (${provas}).`,
+          );
         }
+        escolhidas.sort((a, b) => a.ano - b.ano || a.numero - b.numero);
         return montarQuestoes(escolhidas.map(paraPublica), imagens, avisos);
       }),
   );

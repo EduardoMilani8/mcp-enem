@@ -276,3 +276,27 @@ test("corrigir_resposta confere contra a questão do idioma informado", async ()
     ["ingles", false],
   ]);
 });
+
+test("sem ano, completa com outras provas quando a primeira já foi toda respondida", async () => {
+  // aleatorio fixo em 0 faz o sorteio começar sempre pela prova já baixada.
+  const { chamar, historico } = await montar({ aleatorio: () => 0 });
+  await chamar("buscar_questoes", { ano: 2023, quantidade: 1, area: "linguagens" });
+  for (let numero = 136; numero <= 180; numero++) await historico.registrar(tentativaDeMatematica(numero, true));
+
+  const resultado = await chamar("buscar_questoes", { area: "matematica", quantidade: 5 });
+  expect(resultado.isError).toBeFalsy();
+  expect(numerosDe(resultado)).toHaveLength(5);
+  expect(textoDe(resultado)).toContain("ENEM 2022");
+  expect(textoDe(resultado)).not.toContain("ENEM 2023");
+});
+
+test("sem ano, junta questões de mais de uma prova para completar a quantidade", async () => {
+  const { chamar, historico } = await montar({ aleatorio: () => 0 });
+  await chamar("buscar_questoes", { ano: 2023, quantidade: 1, area: "linguagens" });
+  for (let numero = 136; numero <= 177; numero++) await historico.registrar(tentativaDeMatematica(numero, true));
+
+  const resultado = await chamar("buscar_questoes", { area: "matematica", quantidade: 5, apenas_texto: false });
+  expect(numerosDe(resultado)).toHaveLength(5);
+  expect(textoDe(resultado).match(/ENEM 2023 · Questão/g)).toHaveLength(3);
+  expect(textoDe(resultado).match(/ENEM 2022 · Questão/g)).toHaveLength(2);
+});

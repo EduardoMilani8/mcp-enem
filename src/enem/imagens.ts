@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { log } from "../log.js";
@@ -63,7 +63,7 @@ export class CarregadorDeImagens {
       const bytes = Buffer.from(await resposta.arrayBuffer());
       if (bytes.length === 0 || bytes.length > this.limiteBytes) return null;
       await mkdir(this.pasta, { recursive: true });
-      const temporario = `${caminho}.${process.pid}.tmp`;
+      const temporario = `${caminho}.${randomUUID()}.tmp`;
       await writeFile(temporario, bytes);
       await rename(temporario, caminho);
       return { dados: bytes.toString("base64"), mimeType };

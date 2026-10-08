@@ -29,3 +29,11 @@ test("não deixa arquivo temporário para trás", async () => {
   expect(await readdir(pasta)).toEqual(["dados.json"]);
   expect(await lerJson(join(pasta, "dados.json"))).toEqual([2]);
 });
+
+test("duas gravações simultâneas no mesmo arquivo não falham nem deixam lixo", async () => {
+  const pasta = await pastaTemporaria();
+  const caminho = join(pasta, "dados.json");
+  await Promise.all([gravarJson(caminho, [1]), gravarJson(caminho, [2]), gravarJson(caminho, [3])]);
+  expect([[1], [2], [3]]).toContainEqual(await lerJson(caminho));
+  expect(await readdir(pasta)).toEqual(["dados.json"]);
+});

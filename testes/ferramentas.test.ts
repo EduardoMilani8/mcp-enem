@@ -12,7 +12,12 @@ import { criarApiFalsa, pastaTemporaria, questoesDaProva } from "./apoio.js";
 
 const VAZAMENTO = /gabarito|correctAlternative|isCorrect/i;
 
-async function montar() {
+interface OpcoesDeMontagem {
+  aleatorio?: () => number;
+  buscarImagem?: typeof fetch;
+}
+
+async function montar(opcoes: OpcoesDeMontagem = {}) {
   const pasta = await pastaTemporaria();
   const api = criarApiFalsa([
     {
@@ -32,9 +37,10 @@ async function montar() {
     repositorio: new RepositorioEnem(new ClienteApi({ buscar, intervaloMs: 0 }), join(pasta, "cache")),
     historico,
     imagens: new CarregadorDeImagens(join(pasta, "imagens"), {
-      buscar: async () => new Response(new Uint8Array([1, 2, 3])),
+      buscar: opcoes.buscarImagem ?? (async () => new Response(new Uint8Array([1, 2, 3]))),
     }),
     agora: () => new Date("2026-10-08T12:00:00.000Z"),
+    aleatorio: opcoes.aleatorio,
   });
   const [ladoDoServidor, ladoDoCliente] = InMemoryTransport.createLinkedPair();
   await servidor.connect(ladoDoServidor);
@@ -245,4 +251,28 @@ test("revisar_erros devolve a questão errada sem gabarito, e ela some depois do
 
   await chamar("corrigir_resposta", { ano: 2023, numero: 141, resposta: "B" });
   expect(textoDe(await chamar("revisar_erros"))).toContain("Nenhum erro pendente");
+});
+
+test("corrigir_resposta exige o idioma quando a questão existe em mais de um", async () => {
+  const { chamar, historico } = await montar();
+  const semIdioma = await chamar("corrigir_resposta", { ano: 2023, numero: 3, resposta: "B" });
+  expect(semIdioma.isError).toBe(true);
+  expect(textoDe(semIdioma)).toContain("idioma");
+  expect(await historico.ler()).toEqual([]);
+});
+
+test("corrigir_resposta confere contra a questão do idioma informado", async () => {
+  const { chamar, historico } = await montar();
+  const espanhol = await chamar("corrigir_resposta", { ano: 2023, numero: 3, resposta: "B", idioma: "espanhol" });
+  expect(textoDe(espanhol)).toContain("Resposta correta");
+  expect(textoDe(espanhol)).toContain("espanhol");
+
+  const ingles = await chamar("corrigir_resposta", { ano: 2023, numero: 3, resposta: "B", idioma: "ingles" });
+  expect(textoDe(ingles)).toContain("Resposta incorreta");
+  expect(textoDe(ingles)).toContain("C) Alternativa C");
+
+  expect((await historico.ler()).map((t) => [t.idioma, t.acertou])).toEqual([
+    ["espanhol", true],
+    ["ingles", false],
+  ]);
 });

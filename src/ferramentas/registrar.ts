@@ -185,11 +185,27 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
         resposta: z
           .enum(["A", "B", "C", "D", "E", "a", "b", "c", "d", "e"])
           .describe("A alternativa que o aluno escolheu, de A a E."),
-        idioma: campoIdioma.optional(),
+        idioma: campoIdioma
+          .optional()
+          .describe(
+            "Obrigatório nas questões de língua estrangeira: o idioma da questão que o aluno respondeu " +
+              '(aparece na linha "Língua estrangeira" da questão).',
+          ),
       },
     },
     async ({ ano, numero, resposta, idioma }) =>
       protegido(async () => {
+        // A mesma questão em inglês e em espanhol tem gabaritos diferentes:
+        // sem saber o idioma, corrigir seria um chute.
+        const idiomasDaQuestao = (await repositorio.questoesDoAno(ano))
+          .filter((q) => q.numero === numero)
+          .flatMap((q) => (q.idioma ? [q.idioma] : []));
+        if (idioma === undefined && idiomasDaQuestao.length > 1) {
+          return falha(
+            `A questão ${numero} do ENEM ${ano} existe em mais de um idioma (${idiomasDaQuestao.join(", ")}). ` +
+              'Informe no parâmetro "idioma" qual deles o aluno respondeu.',
+          );
+        }
         const questao = await repositorio.obterQuestao(ano, numero, idioma);
         const marcada = LETRAS.find((letra) => letra === resposta.toUpperCase());
         if (!marcada) return falha("A resposta deve ser uma letra de A a E.");
@@ -206,10 +222,11 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
         });
         const correta = questao.alternativas.find((a) => a.letra === questao.gabarito);
         const gabarito = `${questao.gabarito}) ${correta?.texto ?? "(alternativa em imagem)"}`;
+        const qual = questao.idioma ? ` (questão ${questao.numero}, em ${questao.idioma})` : "";
         return texto(
           acertou
-            ? `Resposta correta. Gabarito oficial: ${gabarito}`
-            : `Resposta incorreta. O aluno marcou ${marcada}. Gabarito oficial: ${gabarito}`,
+            ? `Resposta correta${qual}. Gabarito oficial: ${gabarito}`
+            : `Resposta incorreta${qual}. O aluno marcou ${marcada}. Gabarito oficial: ${gabarito}`,
         );
       }),
   );

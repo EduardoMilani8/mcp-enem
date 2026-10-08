@@ -35,7 +35,7 @@ function areaDoNumero(numero: number): string {
 
 /**
  * Uma prova parecida com a real: 180 questões, a 34 anulada, e as de 1 a 5
- * em cada idioma informado. O gabarito é sempre "B".
+ * em cada idioma informado. O gabarito é "B", menos nas de inglês, que é "C".
  */
 export function questoesDaProva(
   ano: number,
@@ -47,7 +47,11 @@ export function questoesDaProva(
     if (numero === 34) continue;
     const base = { year: ano, discipline: areaDoNumero(numero), ...extras };
     if (numero <= 5 && idiomas.length > 0) {
-      for (const language of idiomas) lista.push(questaoApi(numero, { ...base, language }));
+      // Gabaritos diferentes por idioma: assim um teste percebe se a correção
+      // foi feita contra a questão do idioma errado.
+      for (const language of idiomas) {
+        lista.push(questaoApi(numero, { ...base, language, correctAlternative: language === "ingles" ? "C" : "B" }));
+      }
     } else {
       lista.push(questaoApi(numero, base));
     }

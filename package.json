@@ -1,0 +1,42 @@
+{
+  "name": "mcp-enem",
+  "version": "0.1.0",
+  "description": "Servidor MCP para estudar para o ENEM: questões reais, correção com gabarito oficial e acompanhamento de desempenho.",
+  "type": "module",
+  "bin": {
+    "mcp-enem": "dist/servidor.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "tipos": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "verificar": "tsc -p tsconfig.json && vitest run"
+  },
+  "keywords": [
+    "mcp",
+    "enem",
+    "model-context-protocol",
+    "claude",
+    "educacao"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EduardoMilani8/mcp-enem.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

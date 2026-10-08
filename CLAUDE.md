@@ -11,5 +11,5 @@ Servidor MCP em TypeScript para estudar para o ENEM. Especificação em
   `historico`).
 - Nunca escrever no stdout: é o canal do protocolo MCP. Logs vão para o stderr.
 - Nenhuma ferramenta além de `corrigir_resposta` pode devolver o gabarito.
-- Testes automáticos não usam a rede; usam as respostas gravadas em
-  `testes/fixtures/`.
+- Testes automáticos não usam a rede; usam a API falsa de `testes/apoio.ts`.
+- O plano de implementação está em `docs/plano-de-implementacao.md`.

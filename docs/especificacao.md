@@ -28,9 +28,9 @@ Fatos verificados em 08/10/2026:
 | Fato | Valor |
 |---|---|
 | Provas disponíveis | 2009 a 2023 |
-| Questões por ano | 183 (180 + as 5 de língua estrangeira em dobro) |
+| Questões por ano | cerca de 180, mais as 5 de língua estrangeira em cada idioma |
 | Áreas | `linguagens`, `ciencias-humanas`, `ciencias-natureza`, `matematica` |
-| Idiomas das questões 1 a 5 | `ingles`, `espanhol` |
+| Idiomas de língua estrangeira | `ingles`, `espanhol` (2009 não tem; 2011 só espanhol) |
 | Limite de requisições | 10 a cada 10 segundos |
 | Máximo por página | 50 questões (`limit` maior devolve erro 400) |
 | Questões com imagem | cerca de 40% (campo `files` e/ou imagem em alternativa) |
@@ -39,9 +39,17 @@ Fatos verificados em 08/10/2026:
 Limitações conhecidas da fonte:
 
 - Não há classificação por matéria ou assunto, só as 4 áreas.
-- Algumas imagens estão quebradas na origem (`broken-image.svg`).
-- A paginação pode devolver um item a mais que o `limit` pedido.
+- Algumas imagens estão quebradas na origem (`broken-image.svg`) e algumas
+  alternativas vêm vazias.
+- Questões anuladas não existem na API (2023 não tem a 34 nem a 174).
+- O `offset` da paginação é o número da questão, e as páginas se sobrepõem.
+- Sem o parâmetro `language`, as questões de língua estrangeira vêm só em
+  espanhol; o inglês exige outra chamada. A posição delas muda conforme o ano
+  (1 a 5 em 2023, 91 a 95 em 2015).
+- `metadata.total` não é confiável e o filtro `discipline` é ignorado.
 - É mantida por uma pessoa; pode ficar fora do ar.
+
+O detalhamento está em [plano-de-implementacao.md](plano-de-implementacao.md).
 
 ## Arquitetura
 
@@ -144,7 +152,8 @@ para refazer.
 2. Se o ano não foi informado, sorteia um, dando preferência aos que já estão
    em cache.
 3. `enem/` lê `cache/<ano>.json`. Se não existir, baixa o ano inteiro (4 páginas
-   de 50), remove duplicatas por (ano, número, idioma) e grava.
+   de 50, mais uma chamada para o segundo idioma), remove duplicatas por
+   (ano, número, idioma) e grava.
 4. A ferramenta filtra por área, idioma, imagem e ineditismo, sorteia e remove
    o gabarito antes de responder.
 5. As imagens das questões escolhidas são baixadas, guardadas em cache e
@@ -168,7 +177,9 @@ para refazer.
 | Ano ou questão inexistente | Mensagem dizendo quais anos e números são válidos |
 | Parâmetro inválido | `zod` rejeita com mensagem em português |
 | Gabarito vazando | Tipo separado para "questão pública" sem o campo de gabarito; só `corrigir_resposta` acessa a versão completa |
-| Imagem quebrada na origem | Questão marcada como `imagem_indisponivel` e pulada no sorteio |
+| Imagem quebrada ou alternativa vazia na origem | Questão marcada como `incompleta` e pulada no sorteio |
+| Muitas imagens numa resposta | No máximo 8 anexadas; as demais vão só como link |
+| Prova sem o idioma pedido | As questões de língua estrangeira ficam de fora; nenhuma chamada inválida à API |
 | Falha ao baixar imagem | Questão vai só com o link e um aviso |
 | Questões 1 a 5 em dobro | Filtro por `idioma`; a chave da questão inclui o idioma |
 | Texto escrito no stdout | Proibido: o stdout é o canal do protocolo. Todo log vai para o stderr |
@@ -180,7 +191,9 @@ para refazer.
 
 - **Unitários** para `enem/` (paginação, duplicatas, cache, limite) e
   `historico/` (gravação, estatísticas, linhas corrompidas), com a rede
-  simulada por respostas reais gravadas em `testes/fixtures/`.
+  simulada por uma API falsa em `testes/apoio.ts`, que imita o comportamento
+  da real com questões inventadas (assim o repositório não redistribui dados
+  da enem.dev).
 - **Das ferramentas**: cada uma chamada de ponta a ponta com um diretório
   temporário, incluindo um teste que garante que nenhuma resposta de
   `buscar_questoes`, `obter_questao` ou `revisar_erros` contém o gabarito.
@@ -212,6 +225,7 @@ O README dá crédito ao projeto enem.dev. As questões são do INEP.
 1. **Exibição de imagens**: o Claude recebe a imagem e consegue ler, mas é
    preciso confirmar no primeiro teste manual se o aluno também a vê na
    conversa. Se não vir, o padrão de `apenas_texto` muda para `true`.
-2. **Nome no npm**: confirmar se `mcp-enem` está livre antes de publicar.
+2. **Nome no npm**: `mcp-enem` estava livre em 08/10/2026; confirmar de novo
+   antes de publicar.
 3. **Idioma do código**: nomes de domínio em português (`questao`, `gabarito`,
    `historico`), seguindo a decisão de manter o projeto em português.

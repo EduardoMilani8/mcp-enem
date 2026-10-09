@@ -92,3 +92,13 @@ test("erros pendentes: só questões erradas, uma entrada por questão", () => {
 test("erros pendentes: quem errou e depois acertou não está mais pendente", () => {
   expect(errosPendentes([errada({ numero: 2 }), tentativa({ numero: 2 })])).toEqual([]);
 });
+
+test("uma linha cortada no fim do arquivo não leva junto a tentativa seguinte", async () => {
+  const caminho = join(await pastaTemporaria(), "historico.jsonl");
+  const historico = new Historico(caminho);
+  await historico.registrar(tentativa({ numero: 1 }));
+  await appendFile(caminho, '{"quando": "2026', "utf8");
+  await historico.registrar(tentativa({ numero: 2 }));
+  await historico.registrar(tentativa({ numero: 3 }));
+  expect((await historico.ler()).map((t) => t.numero)).toEqual([1, 2, 3]);
+});

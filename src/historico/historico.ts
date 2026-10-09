@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
 import { AREAS, IDIOMAS, LETRAS } from "../enem/tipos.js";
@@ -27,7 +27,27 @@ export class Historico {
 
   async registrar(tentativa: Tentativa): Promise<void> {
     await mkdir(dirname(this.caminho), { recursive: true });
-    await appendFile(this.caminho, `${JSON.stringify(tentativa)}\n`, "utf8");
+    // Se a gravação anterior foi interrompida, a última linha ficou sem fim;
+    // sem a quebra, esta tentativa seria colada nela e as duas se perderiam.
+    const prefixo = (await this.terminaComLinhaCortada()) ? "\n" : "";
+    await appendFile(this.caminho, `${prefixo}${JSON.stringify(tentativa)}\n`, "utf8");
+  }
+
+  private async terminaComLinhaCortada(): Promise<boolean> {
+    let arquivo;
+    try {
+      arquivo = await open(this.caminho, "r");
+    } catch {
+      return false;
+    }
+    try {
+      const { size } = await arquivo.stat();
+      if (size === 0) return false;
+      const { buffer } = await arquivo.read(Buffer.alloc(1), 0, 1, size - 1);
+      return buffer[0] !== 0x0a;
+    } finally {
+      await arquivo.close();
+    }
   }
 
   async ler(): Promise<Tentativa[]> {

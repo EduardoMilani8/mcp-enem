@@ -7,7 +7,7 @@ import { AREAS, ErroEnem, IDIOMAS, LETRAS, paraPublica, type Questao, type Quest
 import { calcularDesempenho, chavesRespondidas, errosPendentes } from "../historico/estatisticas.js";
 import type { Historico } from "../historico/historico.js";
 import { log } from "../log.js";
-import { formatarDesempenho, formatarQuestao } from "./formatar.js";
+import { formatarDesempenho, formatarQuestao, NOMES_DOS_IDIOMAS } from "./formatar.js";
 import { escolherAno, filtrar, sortear } from "./sorteio.js";
 
 // Mensagens de validação do zod em português do Brasil.
@@ -302,7 +302,7 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
         });
         const correta = questao.alternativas.find((a) => a.letra === questao.gabarito);
         const gabarito = `${questao.gabarito}) ${correta?.texto ?? "(alternativa em imagem)"}`;
-        const qual = questao.idioma ? ` (questão ${questao.numero}, em ${questao.idioma})` : "";
+        const qual = questao.idioma ? ` (questão ${questao.numero}, em ${NOMES_DOS_IDIOMAS[questao.idioma]})` : "";
         return texto(
           acertou
             ? `Resposta correta${qual}. Gabarito oficial: ${gabarito}`

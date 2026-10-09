@@ -276,6 +276,7 @@ test("corrigir_resposta confere contra a questão do idioma informado", async ()
 
   const ingles = await chamar("corrigir_resposta", { ano: 2023, numero: 3, resposta: "B", idioma: "ingles" });
   expect(textoDe(ingles)).toContain("Resposta incorreta");
+  expect(textoDe(ingles)).toContain("em inglês");
   expect(textoDe(ingles)).toContain("C) Alternativa C");
 
   expect((await historico.ler()).map((t) => [t.idioma, t.acertou])).toEqual([

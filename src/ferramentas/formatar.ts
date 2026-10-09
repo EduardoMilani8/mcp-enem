@@ -1,7 +1,7 @@
 import { AREAS, NOMES_DAS_AREAS, type Idioma, type QuestaoPublica } from "../enem/tipos.js";
 import type { Desempenho, Placar } from "../historico/estatisticas.js";
 
-const NOMES_DOS_IDIOMAS: Record<Idioma, string> = { ingles: "inglês", espanhol: "espanhol" };
+export const NOMES_DOS_IDIOMAS: Record<Idioma, string> = { ingles: "inglês", espanhol: "espanhol" };
 
 export function formatarQuestao(questao: QuestaoPublica): string {
   const linhas = [`## ENEM ${questao.ano} · Questão ${questao.numero} · ${NOMES_DAS_AREAS[questao.area]}`];

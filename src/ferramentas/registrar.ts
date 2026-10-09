@@ -10,8 +10,8 @@ import { log } from "../log.js";
 import { formatarDesempenho, formatarQuestao } from "./formatar.js";
 import { escolherAno, filtrar, sortear } from "./sorteio.js";
 
-// Mensagens de validação do zod em português.
-z.config(z.locales.pt());
+// Mensagens de validação do zod em português do Brasil.
+z.config(z.locales.ptBR());
 
 export interface Dependencias {
   repositorio: RepositorioEnem;

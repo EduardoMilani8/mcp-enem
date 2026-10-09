@@ -221,6 +221,7 @@ test("parâmetro inválido é recusado com mensagem em português", async () => 
   expect(resultado.isError).toBe(true);
   expect(textoDe(resultado)).toContain("20");
   expect(textoDe(resultado)).not.toContain("Too big");
+  expect(textoDe(resultado)).not.toContain("Demasiado");
 
   const letra = await chamar("corrigir_resposta", { ano: 2023, numero: 140, resposta: "Z" });
   expect(letra.isError).toBe(true);

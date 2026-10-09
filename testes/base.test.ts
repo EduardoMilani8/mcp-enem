@@ -1,8 +1,10 @@
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { diretorioDeDados } from "../src/config.js";
 import { chaveDaQuestao, ErroEnem, paraPublica, type Questao } from "../src/enem/tipos.js";
+import { VERSAO } from "../src/versao.js";
 
 const QUESTAO: Questao = {
   ano: 2023,
@@ -50,4 +52,9 @@ test("expande o ~ de MCP_ENEM_DIR, que num JSON de configuração chega literal"
   expect(diretorioDeDados({ MCP_ENEM_DIR: "~/estudos/enem" })).toBe(join(homedir(), "estudos", "enem"));
   expect(diretorioDeDados({ MCP_ENEM_DIR: "~" })).toBe(homedir());
   expect(diretorioDeDados({ MCP_ENEM_DIR: "/tmp/~nao-mexe" })).toBe("/tmp/~nao-mexe");
+});
+
+test("a versão do servidor é a do package.json", () => {
+  const pacote = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+  expect(VERSAO).toBe(pacote.version);
 });

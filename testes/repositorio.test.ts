@@ -138,3 +138,29 @@ test("um download que falha não fica preso: a tentativa seguinte funciona", asy
   falhar = false;
   expect(await repositorio.questoesDoAno(2023)).toHaveLength(184);
 });
+
+test("cache de ano com formato errado é baixado de novo", async () => {
+  const api = apiPadrao();
+  const pasta = await pastaTemporaria();
+  await writeFile(join(pasta, "2023.json"), JSON.stringify(Array(200).fill({ ano: 2023 })), "utf8");
+  const repositorio = new RepositorioEnem(new ClienteApi({ buscar: api.buscar, intervaloMs: 0 }), pasta);
+  const questoes = await repositorio.questoesDoAno(2023);
+  expect(questoes).toHaveLength(184);
+  expect(questoes.every((q) => typeof q.gabarito === "string")).toBe(true);
+});
+
+test("não guarda uma prova que veio incompleta da API", async () => {
+  const completa = apiPadrao();
+  const inteira = await new ClienteApi({ buscar: completa.buscar, intervaloMs: 0 }).questoesDoAno({
+    ano: 2023,
+    titulo: "ENEM 2023",
+    idiomas: ["ingles", "espanhol"],
+  });
+  const fontePelaMetade: FonteDeDados = {
+    listarProvas: async () => [{ ano: 2023, titulo: "ENEM 2023", idiomas: ["ingles", "espanhol"] }],
+    questoesDoAno: async () => inteira.slice(0, 40),
+  };
+  const repositorio = new RepositorioEnem(fontePelaMetade, await pastaTemporaria());
+  await expect(repositorio.questoesDoAno(2023)).rejects.toMatchObject({ codigo: "resposta_invalida" });
+  expect(await repositorio.anosEmCache()).toEqual([]);
+});

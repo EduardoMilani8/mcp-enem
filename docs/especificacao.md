@@ -180,7 +180,7 @@ para refazer.
 |---|---|
 | Limite de 10 req/10s | Fila que espaça as requisições; cache em disco faz cada ano ser baixado uma única vez |
 | Resposta 429 mesmo assim | Espera o tempo de `x-ratelimit-reset` e tenta de novo, no máximo 3 vezes |
-| API fora do ar ou lenta | Tempo limite de 15 s; usa o cache se houver; senão, mensagem clara sugerindo tentar um ano já baixado |
+| API fora do ar ou lenta | Tempo limite de 15 s; usa o cache se houver; senão, mensagem clara listando as provas já baixadas |
 | Ano ou questão inexistente | Mensagem dizendo quais anos e números são válidos |
 | Parâmetro inválido | `zod` rejeita com mensagem em português |
 | Gabarito vazando | Tipo separado para "questão pública" sem o campo de gabarito; só `corrigir_resposta` acessa a versão completa |
@@ -189,6 +189,14 @@ para refazer.
 | Servidor de imagens lento | Prazo único de 12 s para todas; as que não chegarem vão só como link |
 | Pedidos simultâneos do mesmo ano | Compartilham um único download |
 | Correção sem idioma em questão de língua estrangeira | Erro pedindo o idioma, sem gravar no histórico |
+| Resposta 200 que não é imagem (página de erro) | O formato é conferido pelos primeiros bytes; o que não for imagem vai só como link e não entra no cache |
+| Cache de um ano com formato errado ou pela metade | Validado ao ler; se não servir, a prova é baixada de novo |
+| Prova que veio incompleta da API (menos de 150 questões) | Erro pedindo para tentar de novo; nada é gravado |
+| Gravação do histórico interrompida no meio de uma linha | A tentativa seguinte começa em linha nova, sem perder as demais |
+| Erros a rever que não puderam ser carregados | Erro explicando, em vez de "nenhum erro pendente" |
+| Questão incompleta pedida diretamente (`obter_questao`, `revisar_erros`) | Vai com um aviso de que está incompleta na fonte |
+| `MCP_ENEM_DIR` começando com `~` | Expandido para a pasta pessoal do usuário |
+| Duas instâncias do servidor ao mesmo tempo | Os arquivos ficam íntegros (gravação atômica, histórico só com acréscimo). O limite de requisições é controlado por processo: se as duas baixarem provas juntas, podem receber 429 e esperar. Limitação aceita |
 | Prova sem o idioma pedido | As questões de língua estrangeira ficam de fora; nenhuma chamada inválida à API |
 | Falha ao baixar imagem | Questão vai só com o link e um aviso |
 | Questões 1 a 5 em dobro | Filtro por `idioma`; a chave da questão inclui o idioma |

@@ -345,14 +345,23 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
       protegido(async () => {
         const pendentes = errosPendentes(await historico.ler()).filter((t) => area === undefined || t.area === area);
         const questoes: QuestaoPublica[] = [];
-        for (const pendente of pendentes.slice(0, quantidade)) {
+        let falhaDeCarga: ErroEnem | null = null;
+        for (const pendente of pendentes) {
+          if (questoes.length >= quantidade) break;
           try {
             const questao = await repositorio.obterQuestao(pendente.ano, pendente.numero, pendente.idioma ?? undefined);
             questoes.push(paraPublica(questao));
           } catch (erro) {
             if (!(erro instanceof ErroEnem)) throw erro;
+            falhaDeCarga = erro;
             log(`não consegui recarregar a questão ${pendente.numero} de ${pendente.ano}: ${erro.message}`);
           }
+        }
+        if (questoes.length === 0 && falhaDeCarga) {
+          throw new ErroEnem(
+            falhaDeCarga.codigo,
+            `Há ${pendentes.length} questão(ões) para rever, mas não consegui carregá-las agora. ${falhaDeCarga.message}`,
+          );
         }
         if (questoes.length === 0) return texto("Nenhum erro pendente para rever.");
         return montarQuestoes(questoes, imagens, [], prazoDasImagensMs);

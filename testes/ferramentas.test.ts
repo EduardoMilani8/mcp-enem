@@ -351,3 +351,24 @@ test("sem internet, o erro diz quais provas já estão baixadas", async () => {
   expect(textoDe(resultado)).toContain("já baixadas");
   expect(textoDe(resultado)).toContain("2023");
 });
+
+test("revisar_erros não diz que não há erros quando só não conseguiu carregá-los", async () => {
+  const { chamar, historico, cortarRede } = await montar();
+  await historico.registrar({ ...tentativaDeMatematica(140, false), ano: 2022 });
+  cortarRede();
+  const resultado = await chamar("revisar_erros");
+  expect(resultado.isError).toBe(true);
+  expect(textoDe(resultado)).toContain("não consegui carregá-las");
+  expect(textoDe(resultado)).not.toContain("Nenhum erro pendente");
+});
+
+test("revisar_erros pula a questão que não carrega e completa com as seguintes", async () => {
+  const { chamar, historico, cortarRede } = await montar();
+  await chamar("buscar_questoes", { ano: 2023, quantidade: 1 });
+  await historico.registrar({ ...tentativaDeMatematica(140, false), ano: 2022 });
+  await historico.registrar(tentativaDeMatematica(141, false));
+  cortarRede();
+  const resultado = await chamar("revisar_erros", { quantidade: 1 });
+  expect(resultado.isError).toBeFalsy();
+  expect(numerosDe(resultado)).toEqual([141]);
+});

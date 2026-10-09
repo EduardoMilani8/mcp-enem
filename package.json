@@ -13,10 +13,12 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "limpar": "node --input-type=commonjs -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run limpar && tsc -p tsconfig.build.json",
     "tipos": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "verificar": "tsc -p tsconfig.json && vitest run"
+    "verificar": "tsc -p tsconfig.json && vitest run",
+    "prepublishOnly": "npm run verificar && npm run build"
   },
   "keywords": [
     "mcp",

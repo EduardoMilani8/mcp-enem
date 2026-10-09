@@ -8,7 +8,7 @@ import { ClienteApi } from "../src/enem/api.js";
 import { CarregadorDeImagens } from "../src/enem/imagens.js";
 import { RepositorioEnem } from "../src/enem/repositorio.js";
 import { Historico, type Tentativa } from "../src/historico/historico.js";
-import { criarApiFalsa, pastaTemporaria, questoesDaProva } from "./apoio.js";
+import { BYTES_PNG, criarApiFalsa, pastaTemporaria, questoesDaProva } from "./apoio.js";
 
 const VAZAMENTO = /gabarito|correctAlternative|isCorrect/i;
 
@@ -38,7 +38,7 @@ async function montar(opcoes: OpcoesDeMontagem = {}) {
     repositorio: new RepositorioEnem(new ClienteApi({ buscar, intervaloMs: 0 }), join(pasta, "cache")),
     historico,
     imagens: new CarregadorDeImagens(join(pasta, "imagens"), {
-      buscar: opcoes.buscarImagem ?? (async () => new Response(new Uint8Array([1, 2, 3]))),
+      buscar: opcoes.buscarImagem ?? (async () => new Response(new Uint8Array(BYTES_PNG))),
     }),
     agora: () => new Date("2026-10-08T12:00:00.000Z"),
     aleatorio: opcoes.aleatorio,
@@ -191,7 +191,11 @@ test("anexa no máximo 8 imagens e avisa das que ficaram só como link", async (
   expect(numerosDe(resultado)).toHaveLength(12);
   const imagens = resultado.content.filter((bloco) => bloco.type === "image");
   expect(imagens).toHaveLength(8);
-  expect(imagens[0]).toMatchObject({ type: "image", data: "AQID", mimeType: "image/png" });
+  expect(imagens[0]).toMatchObject({
+    type: "image",
+    data: Buffer.from(BYTES_PNG).toString("base64"),
+    mimeType: "image/png",
+  });
   expect(textoDe(resultado)).toContain("4 imagem(ns)");
   expect(textoDe(resultado)).toContain("https://enem.dev/2022/figura.png");
 });
@@ -332,6 +336,7 @@ test("imagem que demora demais não segura a resposta", async () => {
 
 test("o total de imagens anexadas respeita um teto de tamanho", async () => {
   const grande = new Uint8Array(600_000).fill(7);
+  grande.set(BYTES_PNG);
   const { chamar } = await montar({ buscarImagem: async () => new Response(grande) });
   const resultado = await chamar("buscar_questoes", { quantidade: 8, ano: 2022, area: "matematica" });
   expect(numerosDe(resultado)).toHaveLength(8);

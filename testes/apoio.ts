@@ -111,3 +111,9 @@ export function criarApiFalsa(provas: ProvaFalsa[]): { buscar: typeof fetch; cha
   };
   return { buscar, chamadas };
 }
+
+/** Começo de um arquivo PNG de verdade, seguido de alguns bytes quaisquer. */
+export const BYTES_PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3];
+
+/** Começo de um arquivo JPEG de verdade, seguido de alguns bytes quaisquer. */
+export const BYTES_JPEG = [0xff, 0xd8, 0xff, 0xe0, 1, 2, 3];

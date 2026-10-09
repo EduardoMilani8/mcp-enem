@@ -15,13 +15,23 @@ export interface OpcoesDeImagens {
   tempoLimiteMs?: number;
 }
 
-const TIPOS_POR_EXTENSAO: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-};
+const EXTENSOES_ACEITAS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
+
+const ASSINATURA_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * Identifica o formato pelos primeiros bytes. Um servidor com problema pode
+ * responder 200 com uma página de erro no lugar da figura; a extensão da URL
+ * não garante nada.
+ */
+function tipoPeloConteudo(bytes: Buffer): string | null {
+  if (bytes.subarray(0, 8).equals(ASSINATURA_PNG)) return "image/png";
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  const inicio = bytes.subarray(0, 12).toString("latin1");
+  if (inicio.startsWith("GIF87a") || inicio.startsWith("GIF89a")) return "image/gif";
+  if (inicio.startsWith("RIFF") && inicio.slice(8, 12) === "WEBP") return "image/webp";
+  return null;
+}
 
 export class CarregadorDeImagens {
   private readonly pasta: string;
@@ -46,13 +56,15 @@ export class CarregadorDeImagens {
     }
     if (endereco.protocol !== "https:") return null;
     const extensao = extname(endereco.pathname).toLowerCase();
-    const mimeType = TIPOS_POR_EXTENSAO[extensao];
-    if (!mimeType) return null;
+    if (!EXTENSOES_ACEITAS.has(extensao)) return null;
 
     const nome = createHash("sha256").update(url).digest("hex").slice(0, 32) + extensao;
     const caminho = join(this.pasta, nome);
     try {
-      return { dados: (await readFile(caminho)).toString("base64"), mimeType };
+      const guardada = await readFile(caminho);
+      const mimeType = tipoPeloConteudo(guardada);
+      if (mimeType) return { dados: guardada.toString("base64"), mimeType };
+      // arquivo em cache que não é imagem: baixa de novo por cima
     } catch {
       // ainda não está em cache
     }
@@ -62,6 +74,8 @@ export class CarregadorDeImagens {
       if (!resposta.ok) return null;
       const bytes = Buffer.from(await resposta.arrayBuffer());
       if (bytes.length === 0 || bytes.length > this.limiteBytes) return null;
+      const mimeType = tipoPeloConteudo(bytes);
+      if (!mimeType) return null;
       await mkdir(this.pasta, { recursive: true });
       const temporario = `${caminho}.${randomUUID()}.tmp`;
       await writeFile(temporario, bytes);

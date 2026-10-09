@@ -6,6 +6,9 @@ const NOMES_DOS_IDIOMAS: Record<Idioma, string> = { ingles: "inglês", espanhol:
 export function formatarQuestao(questao: QuestaoPublica): string {
   const linhas = [`## ENEM ${questao.ano} · Questão ${questao.numero} · ${NOMES_DAS_AREAS[questao.area]}`];
   if (questao.idioma) linhas.push(`Língua estrangeira: ${NOMES_DOS_IDIOMAS[questao.idioma]}`);
+  if (questao.incompleta) {
+    linhas.push("Atenção: esta questão está incompleta na fonte de dados (falta uma imagem ou uma alternativa). Avise o aluno.");
+  }
   if (questao.contexto) linhas.push("", questao.contexto);
   if (questao.enunciado) linhas.push("", questao.enunciado);
   linhas.push("");

@@ -51,11 +51,17 @@ function falha(mensagem: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text: mensagem }] };
 }
 
-async function protegido(acao: () => Promise<CallToolResult>): Promise<CallToolResult> {
+async function proteger(
+  acao: () => Promise<CallToolResult>,
+  dicaSemRede: () => Promise<string>,
+): Promise<CallToolResult> {
   try {
     return await acao();
   } catch (erro) {
-    if (erro instanceof ErroEnem) return falha(erro.message);
+    if (erro instanceof ErroEnem) {
+      const semRede = erro.codigo === "indisponivel" || erro.codigo === "limite";
+      return falha(erro.message + (semRede ? await dicaSemRede() : ""));
+    }
     log("erro inesperado:", erro);
     return falha("Ocorreu um erro inesperado no mcp-enem. Tente de novo.");
   }
@@ -117,6 +123,13 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
   const aleatorio = dependencias.aleatorio ?? Math.random;
   const agora = dependencias.agora ?? (() => new Date());
   const prazoDasImagensMs = dependencias.prazoDasImagensMs ?? PRAZO_PADRAO_DAS_IMAGENS_MS;
+
+  // Sem rede, dizer o que ainda funciona ajuda mais do que só relatar a falha.
+  const protegido = (acao: () => Promise<CallToolResult>) =>
+    proteger(acao, async () => {
+      const baixadas = await repositorio.anosEmCache();
+      return baixadas.length > 0 ? ` Provas já baixadas, que funcionam sem internet: ${baixadas.join(", ")}.` : "";
+    });
 
   servidor.registerTool(
     "listar_provas",

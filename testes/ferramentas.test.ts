@@ -340,3 +340,14 @@ test("o total de imagens anexadas respeita um teto de tamanho", async () => {
   expect(anexadas.reduce((soma, tamanho) => soma + tamanho, 0)).toBeLessThanOrEqual(3_000_000);
   expect(textoDe(resultado)).toContain("imagem(ns) não foram anexadas");
 });
+
+test("sem internet, o erro diz quais provas já estão baixadas", async () => {
+  const { chamar, cortarRede } = await montar();
+  await chamar("buscar_questoes", { ano: 2023, quantidade: 1 });
+  cortarRede();
+  const resultado = await chamar("buscar_questoes", { ano: 2022 });
+  expect(resultado.isError).toBe(true);
+  expect(textoDe(resultado)).toContain("Não consegui falar com a API do ENEM");
+  expect(textoDe(resultado)).toContain("já baixadas");
+  expect(textoDe(resultado)).toContain("2023");
+});

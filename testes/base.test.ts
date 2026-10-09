@@ -45,3 +45,9 @@ test("ErroEnem guarda o código", () => {
   expect(erro.codigo).toBe("limite");
   expect(erro.message).toBe("muitas requisições");
 });
+
+test("expande o ~ de MCP_ENEM_DIR, que num JSON de configuração chega literal", () => {
+  expect(diretorioDeDados({ MCP_ENEM_DIR: "~/estudos/enem" })).toBe(join(homedir(), "estudos", "enem"));
+  expect(diretorioDeDados({ MCP_ENEM_DIR: "~" })).toBe(homedir());
+  expect(diretorioDeDados({ MCP_ENEM_DIR: "/tmp/~nao-mexe" })).toBe("/tmp/~nao-mexe");
+});

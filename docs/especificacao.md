@@ -67,13 +67,14 @@ Cliente MCP (Claude) ──stdio──▶ servidor.ts
                          ~/.mcp-enem/cache   ~/.mcp-enem/historico.jsonl
 ```
 
-Três módulos, cada um com um papel:
+Quatro módulos, cada um com um papel:
 
 | Módulo | Responsabilidade | Depende de |
 |---|---|---|
 | `enem/` | Buscar provas e questões na API, respeitar o limite, guardar em cache | rede, disco |
 | `historico/` | Gravar e ler as tentativas do aluno, calcular estatísticas | disco |
 | `ferramentas/` | Definir as ferramentas MCP, validar parâmetros, montar as respostas | `enem/`, `historico/` |
+| `roteiros/` | Definir os roteiros de estudo (prompts MCP) | nada |
 
 `servidor.ts` só liga as peças e inicia o transporte stdio.
 
@@ -114,9 +115,16 @@ Sorteia questões para o aluno responder.
 | `idioma` | `ingles` ou `espanhol` | `ingles` | só afeta as questões 1 a 5 |
 | `apenas_texto` | booleano | `false` | se `true`, pula questões com imagem |
 | `ineditas` | booleano | `true` | evita questões que o aluno já respondeu |
+| `palavras_chave` | lista de 1 a 8 textos | nenhuma | só questões cujo texto contém pelo menos uma |
 
 Devolve cada questão com ano, número, área, enunciado, alternativas e imagens.
 **Nunca devolve o gabarito.**
+
+A busca por `palavras_chave` é por palavra no texto (contexto, enunciado e
+alternativas), não por tema. Ignora acentos e maiúsculas e exige que a
+palavra-chave esteja no começo de uma palavra: "log" acha "logaritmo" e
+"log 2", mas não "biologia". Sem `ano`, cada chamada procura nas provas já
+baixadas e em até duas novas, e avisa quando ainda há provas por olhar.
 
 ### `obter_questao`
 
@@ -125,28 +133,65 @@ específica, também sem gabarito.
 
 ### `corrigir_resposta`
 
-Parâmetros: `ano`, `numero`, `resposta` (letra de A a E), `idioma` (opcional).
+Parâmetros: `ano`, `numero`, `resposta` (letra de A a E), `idioma`, `materia`
+e `assunto` (os três últimos opcionais).
 
 Devolve se o aluno acertou, a alternativa correta e o texto dela. Grava a
-tentativa no histórico. É a única ferramenta que revela o gabarito.
+tentativa no histórico.
+
+A API só classifica as questões nas quatro grandes áreas. Para ter desempenho
+por matéria, quem classifica é o próprio modelo: ele lê o enunciado e informa
+a `materia` (uma de uma lista fixa de 14, como `fisica` ou `historia`) e o
+`assunto` (texto livre, como "logaritmos"). Uma matéria que não pertence à
+área da questão é ignorada, sem impedir a correção.
 
 Nas questões de língua estrangeira o `idioma` é obrigatório: a mesma questão
 tem gabaritos diferentes em inglês e em espanhol, então sem ele a ferramenta
 devolve um erro pedindo o idioma em vez de adivinhar.
 
+### `ver_gabarito`
+
+Parâmetros: `ano`, `numero`, `idioma` (obrigatório nas questões de língua
+estrangeira).
+
+Mostra a resposta certa **sem gravar nada**. Serve para "me explica essa
+questão" e "resolve essa para mim". Junto com `corrigir_resposta`, é a única
+ferramenta que revela o gabarito.
+
+### `desfazer_ultima_tentativa`
+
+Sem parâmetros. Remove do histórico o último registro e diz qual foi. Existe
+porque uma resposta dada depois de o gabarito já ter sido visto não vale como
+estudo e distorce o desempenho.
+
 ### `ver_desempenho`
 
-Parâmetros opcionais: `area`, `dias` (janela de tempo, padrão: tudo).
+Parâmetros opcionais: `area`, `materia`, `dias` (janela de tempo, padrão: tudo).
 
-Devolve total de tentativas, acertos, percentual geral e por área, e a evolução
-recente.
+Devolve total de tentativas, acertos, percentual geral, dos últimos 7 dias e
+por área. Para as tentativas em que a matéria e o assunto foram informados,
+mostra também o placar por matéria e até cinco assuntos com mais erros.
 
 ### `revisar_erros`
 
-Parâmetros opcionais: `quantidade` (padrão 5), `area`.
+Parâmetros opcionais: `quantidade` (padrão 5), `area`, `materia`.
 
 Devolve questões que o aluno errou e ainda não acertou depois, sem gabarito,
 para refazer.
+
+## Roteiros
+
+Além das ferramentas, o servidor oferece quatro roteiros (no protocolo MCP,
+"prompts"): pedidos prontos que o aluno escolhe num menu do cliente. Um roteiro
+não executa nada; ele entrega ao modelo o passo a passo de uma sessão de
+estudo.
+
+| Roteiro | Argumentos | O que conduz |
+|---|---|---|
+| `simulado_rapido` | `quantidade` (padrão 10, máximo 20), `area` | Questões uma a uma, correção só no final |
+| `revisao_dos_erros` | nenhum | Refazer os erros pendentes, com explicação ao errar de novo |
+| `estudar_assunto` | `assunto` (obrigatório) | Resumo do assunto e questões achadas por palavra-chave |
+| `como_estou` | nenhum | Diagnóstico pelo histórico e plano para a semana |
 
 ## Fluxo de dados
 
@@ -233,10 +278,15 @@ O README dá crédito ao projeto enem.dev. As questões são do INEP.
 ## Fora do escopo da versão 1
 
 - Conector remoto (HTTP) com histórico por usuário.
-- Classificação por matéria ou assunto.
+- Classificação das questões por matéria antes da resposta (hoje a matéria só
+  é conhecida depois que o aluno responde e o modelo a informa).
 - Redação.
 - Provas de 2024 em diante (a API ainda não tem).
-- Simulado cronometrado e nota pelo método TRI.
+- Simulado cronometrado.
+- Baixar todas as provas de uma vez, para uso sem internet.
+- Sequência de dias estudados e meta diária.
+- Nota pelo método TRI: não será feita, porque depende de parâmetros por
+  questão que o INEP não divulga.
 
 ## Pontos em aberto
 
@@ -244,6 +294,8 @@ O README dá crédito ao projeto enem.dev. As questões são do INEP.
    a API, que o servidor anexa as imagens (PNG e JPEG) e manda o link no texto.
    Falta confirmar, usando o Claude de verdade, se o aluno vê a imagem na
    conversa. Se não vir, o padrão de `apenas_texto` muda para `true`.
+   Em 11/10/2026, num teste no Claude Code (terminal), o modelo leu e
+   descreveu a imagem de uma questão; o terminal não exibe a figura.
 2. **Nome no npm**: `mcp-enem` estava livre em 08/10/2026; confirmar de novo
    antes de publicar.
 3. **Idioma do código**: nomes de domínio em português (`questao`, `gabarito`,

@@ -11,8 +11,6 @@ Nenhuma mudança no funcionamento do servidor.
   passos, exemplos do que pedir, perguntas frequentes e solução de problemas.
 - A instalação recomendada passa a usar `mcp-enem@latest`, que busca a versão
   mais recente sempre que o Claude inicia.
-- O servidor se identifica nas requisições à enem.dev com o nome, a versão e o
-  endereço do projeto.
 
 ## 0.1.0 (11/10/2026)
 
@@ -43,3 +41,5 @@ Primeira versão pública.
 - O histórico de respostas fica só na máquina de quem usa.
 - As imagens das questões são anexadas à resposta, com limite de quantidade,
   de tamanho e de tempo de espera.
+- O servidor se identifica nas requisições à enem.dev com o nome, a versão e o
+  endereço do projeto.

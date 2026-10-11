@@ -382,6 +382,24 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
   );
 
   servidor.registerTool(
+    "desfazer_ultima_tentativa",
+    {
+      description:
+        "Remove do histórico a última tentativa registrada por corrigir_resposta. Use só quando o aluno disser " +
+        "que aquele registro foi um engano, por exemplo se respondeu depois de já ter visto a resposta.",
+    },
+    async () =>
+      protegido(async () => {
+        const removida = await historico.removerUltima();
+        if (!removida) return texto("Não há tentativas no histórico para desfazer.");
+        return texto(
+          `Tentativa removida do histórico: questão ${removida.numero} do ENEM ${removida.ano} ` +
+            `(o aluno tinha marcado ${removida.resposta}, ${removida.acertou ? "certa" : "errada"}).`,
+        );
+      }),
+  );
+
+  servidor.registerTool(
     "ver_desempenho",
     {
       description: "Mostra os acertos e erros do aluno, no geral, nos últimos 7 dias e por área do conhecimento.",

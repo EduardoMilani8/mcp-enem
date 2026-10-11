@@ -87,6 +87,7 @@ test("oferece todas as ferramentas", async () => {
   expect(nomes).toEqual([
     "buscar_questoes",
     "corrigir_resposta",
+    "desfazer_ultima_tentativa",
     "listar_provas",
     "obter_questao",
     "revisar_erros",
@@ -455,4 +456,24 @@ test("ver_gabarito de questão anulada dá o mesmo erro explicativo", async () =
   const resultado = await chamar("ver_gabarito", { ano: 2023, numero: 34 });
   expect(resultado.isError).toBe(true);
   expect(textoDe(resultado)).toContain("anulada");
+});
+
+test("desfazer_ultima_tentativa remove o último registro e o desempenho acompanha", async () => {
+  const { chamar, historico } = await montar();
+  await chamar("corrigir_resposta", { ano: 2023, numero: 140, resposta: "B" });
+  await chamar("corrigir_resposta", { ano: 2023, numero: 141, resposta: "C" });
+
+  const desfeita = await chamar("desfazer_ultima_tentativa");
+  expect(desfeita.isError).toBeFalsy();
+  expect(textoDe(desfeita)).toContain("questão 141 do ENEM 2023");
+  expect((await historico.ler()).map((t) => t.numero)).toEqual([140]);
+  expect(textoDe(await chamar("ver_desempenho"))).toContain("Geral: 1 de 1 (100%)");
+  expect(textoDe(await chamar("revisar_erros"))).toContain("Nenhum erro pendente");
+});
+
+test("desfazer_ultima_tentativa sem histórico explica em vez de dar erro", async () => {
+  const { chamar } = await montar();
+  const resultado = await chamar("desfazer_ultima_tentativa");
+  expect(resultado.isError).toBeFalsy();
+  expect(textoDe(resultado)).toContain("Não há tentativas");
 });

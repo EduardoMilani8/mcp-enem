@@ -1,0 +1,45 @@
+name: Verificar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    name: Tipos e testes (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run verificar
+      - run: npm run build
+
+  node-minimo:
+    # O pacote promete funcionar no Node 20, mas o executor de testes exige o
+    # 22. Aqui só se confere que o servidor compilado sobe e responde no 20.
+    name: Servidor no Node 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: O servidor responde ao initialize com JSON
+        run: |
+          resposta=$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' | MCP_ENEM_DIR="$RUNNER_TEMP/mcp-enem" node dist/servidor.js 2>/dev/null | head -1)
+          echo "$resposta"
+          echo "$resposta" | grep -q '"name":"mcp-enem"'

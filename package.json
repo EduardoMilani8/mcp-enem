@@ -22,12 +22,20 @@
   },
   "keywords": [
     "mcp",
-    "enem",
+    "mcp-server",
     "model-context-protocol",
-    "claude",
-    "educacao"
+    "enem",
+    "vestibular",
+    "estudo",
+    "educacao",
+    "claude"
   ],
   "license": "MIT",
+  "author": "Eduardo Milani",
+  "homepage": "https://github.com/EduardoMilani8/mcp-enem#readme",
+  "bugs": {
+    "url": "https://github.com/EduardoMilani8/mcp-enem/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/EduardoMilani8/mcp-enem.git"

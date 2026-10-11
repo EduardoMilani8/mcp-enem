@@ -296,7 +296,7 @@ O README dá crédito ao projeto enem.dev. As questões são do INEP.
    conversa. Se não vir, o padrão de `apenas_texto` muda para `true`.
    Em 11/10/2026, num teste no Claude Code (terminal), o modelo leu e
    descreveu a imagem de uma questão; o terminal não exibe a figura.
-2. **Nome no npm**: `mcp-enem` estava livre em 08/10/2026; confirmar de novo
-   antes de publicar.
+2. **Nome no npm**: resolvido. O pacote `mcp-enem` foi publicado em
+   11/10/2026, na versão 0.1.0.
 3. **Idioma do código**: nomes de domínio em português (`questao`, `gabarito`,
    `historico`), seguindo a decisão de manter o projeto em português.

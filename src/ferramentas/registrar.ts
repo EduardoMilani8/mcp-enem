@@ -383,10 +383,10 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
         const classificacao = [materiaValida ? NOMES_DAS_MATERIAS[materia] : null, assunto ?? null].filter(
           (parte) => parte !== null,
         );
-        const registro = classificacao.length > 0 ? ` Registrado em: ${classificacao.join(", ")}.` : "";
+        const registro = classificacao.length > 0 ? `\nRegistrado em: ${classificacao.join(", ")}.` : "";
         const materiaRecusada =
           materia !== undefined && !materiaValida
-            ? ` A matéria "${NOMES_DAS_MATERIAS[materia]}" não foi registrada: ela não pertence à área desta ` +
+            ? `\nA matéria "${NOMES_DAS_MATERIAS[materia]}" não foi registrada: ela não pertence à área desta ` +
               `questão (${NOMES_DAS_AREAS[questao.area]}).`
             : "";
         return texto(
@@ -412,8 +412,9 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
       protegido(async () => {
         const questao = await questaoComGabarito(ano, numero, idioma);
         return texto(
+          // Em linhas separadas: o texto da alternativa pode ou não terminar em ponto.
           `Gabarito oficial da questão ${questao.numero} do ENEM ${questao.ano}${emQualIdioma(questao)}: ` +
-            `${textoDoGabarito(questao)}. Nada foi registrado no histórico.`,
+            `${textoDoGabarito(questao)}\nNada foi registrado no histórico.`,
         );
       }),
   );

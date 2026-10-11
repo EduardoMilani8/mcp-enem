@@ -45,7 +45,12 @@ export interface Prova {
   idiomas: Idioma[];
 }
 
-export type CodigoDeErro = "nao_encontrado" | "limite" | "indisponivel" | "resposta_invalida";
+export type CodigoDeErro =
+  | "nao_encontrado"
+  | "limite"
+  | "indisponivel"
+  | "resposta_invalida"
+  | "parametro_invalido";
 
 /** Erro esperado, com mensagem pronta para ser mostrada ao aluno. */
 export class ErroEnem extends Error {

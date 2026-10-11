@@ -3,7 +3,16 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { CarregadorDeImagens } from "../enem/imagens.js";
 import type { RepositorioEnem } from "../enem/repositorio.js";
-import { AREAS, ErroEnem, IDIOMAS, LETRAS, paraPublica, type Questao, type QuestaoPublica } from "../enem/tipos.js";
+import {
+  AREAS,
+  ErroEnem,
+  IDIOMAS,
+  LETRAS,
+  paraPublica,
+  type Idioma,
+  type Questao,
+  type QuestaoPublica,
+} from "../enem/tipos.js";
 import { calcularDesempenho, chavesRespondidas, errosPendentes } from "../historico/estatisticas.js";
 import type { Historico } from "../historico/historico.js";
 import { log } from "../log.js";
@@ -130,6 +139,38 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
       const baixadas = await repositorio.anosEmCache();
       return baixadas.length > 0 ? ` Provas já baixadas, que funcionam sem internet: ${baixadas.join(", ")}.` : "";
     });
+
+  // A mesma questão em inglês e em espanhol tem gabaritos diferentes: sem
+  // saber o idioma, conferir ou mostrar a resposta seria um chute.
+  async function questaoComGabarito(ano: number, numero: number, idioma?: Idioma): Promise<Questao> {
+    const idiomasDaQuestao = (await repositorio.questoesDoAno(ano))
+      .filter((q) => q.numero === numero)
+      .flatMap((q) => (q.idioma ? [q.idioma] : []));
+    if (idioma === undefined && idiomasDaQuestao.length > 1) {
+      throw new ErroEnem(
+        "parametro_invalido",
+        `A questão ${numero} do ENEM ${ano} existe em mais de um idioma (${idiomasDaQuestao.join(", ")}). ` +
+          'Informe no parâmetro "idioma" qual deles o aluno respondeu.',
+      );
+    }
+    return repositorio.obterQuestao(ano, numero, idioma);
+  }
+
+  function textoDoGabarito(questao: Questao): string {
+    const correta = questao.alternativas.find((a) => a.letra === questao.gabarito);
+    return `${questao.gabarito}) ${correta?.texto ?? "(alternativa em imagem)"}`;
+  }
+
+  function emQualIdioma(questao: Questao): string {
+    return questao.idioma ? `, em ${NOMES_DOS_IDIOMAS[questao.idioma]}` : "";
+  }
+
+  const campoIdiomaDaQuestao = campoIdioma
+    .optional()
+    .describe(
+      "Obrigatório nas questões de língua estrangeira: o idioma da questão que o aluno respondeu " +
+        '(aparece na linha "Língua estrangeira" da questão).',
+    );
 
   servidor.registerTool(
     "listar_provas",
@@ -284,35 +325,20 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
     {
       description:
         "Confere a resposta do aluno com o gabarito oficial, revela a alternativa correta e registra a " +
-        "tentativa no histórico. Chame só depois que o aluno tiver escolhido uma alternativa.",
+        "tentativa no histórico. Chame só depois que o aluno tiver escolhido uma alternativa. Se ele já viu a " +
+        "resposta (por ver_gabarito ou porque você a contou), não chame: a tentativa não valeria como estudo.",
       inputSchema: {
         ano: campoAno,
         numero: campoNumero,
         resposta: z
           .enum(["A", "B", "C", "D", "E", "a", "b", "c", "d", "e"])
           .describe("A alternativa que o aluno escolheu, de A a E."),
-        idioma: campoIdioma
-          .optional()
-          .describe(
-            "Obrigatório nas questões de língua estrangeira: o idioma da questão que o aluno respondeu " +
-              '(aparece na linha "Língua estrangeira" da questão).',
-          ),
+        idioma: campoIdiomaDaQuestao,
       },
     },
     async ({ ano, numero, resposta, idioma }) =>
       protegido(async () => {
-        // A mesma questão em inglês e em espanhol tem gabaritos diferentes:
-        // sem saber o idioma, corrigir seria um chute.
-        const idiomasDaQuestao = (await repositorio.questoesDoAno(ano))
-          .filter((q) => q.numero === numero)
-          .flatMap((q) => (q.idioma ? [q.idioma] : []));
-        if (idioma === undefined && idiomasDaQuestao.length > 1) {
-          return falha(
-            `A questão ${numero} do ENEM ${ano} existe em mais de um idioma (${idiomasDaQuestao.join(", ")}). ` +
-              'Informe no parâmetro "idioma" qual deles o aluno respondeu.',
-          );
-        }
-        const questao = await repositorio.obterQuestao(ano, numero, idioma);
+        const questao = await questaoComGabarito(ano, numero, idioma);
         const marcada = LETRAS.find((letra) => letra === resposta.toUpperCase());
         if (!marcada) return falha("A resposta deve ser uma letra de A a E.");
         const acertou = marcada === questao.gabarito;
@@ -326,13 +352,31 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
           correta: questao.gabarito,
           acertou,
         });
-        const correta = questao.alternativas.find((a) => a.letra === questao.gabarito);
-        const gabarito = `${questao.gabarito}) ${correta?.texto ?? "(alternativa em imagem)"}`;
-        const qual = questao.idioma ? ` (questão ${questao.numero}, em ${NOMES_DOS_IDIOMAS[questao.idioma]})` : "";
+        const gabarito = textoDoGabarito(questao);
+        const qual = questao.idioma ? ` (questão ${questao.numero}${emQualIdioma(questao)})` : "";
         return texto(
           acertou
             ? `Resposta correta${qual}. Gabarito oficial: ${gabarito}`
             : `Resposta incorreta${qual}. O aluno marcou ${marcada}. Gabarito oficial: ${gabarito}`,
+        );
+      }),
+  );
+
+  servidor.registerTool(
+    "ver_gabarito",
+    {
+      description:
+        "Mostra a resposta certa de uma questão SEM registrar nada no histórico. Use quando o aluno pedir para " +
+        "ver a resposta ou a resolução sem tentar responder, ou quando pedir que você resolva a questão. " +
+        "Depois disso, não chame corrigir_resposta para a mesma questão.",
+      inputSchema: { ano: campoAno, numero: campoNumero, idioma: campoIdiomaDaQuestao },
+    },
+    async ({ ano, numero, idioma }) =>
+      protegido(async () => {
+        const questao = await questaoComGabarito(ano, numero, idioma);
+        return texto(
+          `Gabarito oficial da questão ${questao.numero} do ENEM ${questao.ano}${emQualIdioma(questao)}: ` +
+            `${textoDoGabarito(questao)}. Nada foi registrado no histórico.`,
         );
       }),
   );

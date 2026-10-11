@@ -81,7 +81,7 @@ function tentativaDeMatematica(numero: number, acertou: boolean): Tentativa {
   };
 }
 
-test("oferece as seis ferramentas", async () => {
+test("oferece todas as ferramentas", async () => {
   const { cliente } = await montar();
   const nomes = (await cliente.listTools()).tools.map((t) => t.name).sort();
   expect(nomes).toEqual([
@@ -91,6 +91,7 @@ test("oferece as seis ferramentas", async () => {
     "obter_questao",
     "revisar_erros",
     "ver_desempenho",
+    "ver_gabarito",
   ]);
 });
 
@@ -425,4 +426,33 @@ test("palavra-chave curta demais ou lista vazia são recusadas", async () => {
   const { chamar } = await montar();
   expect((await chamar("buscar_questoes", { palavras_chave: ["a"] })).isError).toBe(true);
   expect((await chamar("buscar_questoes", { palavras_chave: [] })).isError).toBe(true);
+});
+
+test("ver_gabarito mostra a resposta certa sem registrar nada", async () => {
+  const { chamar, historico } = await montar();
+  const resultado = await chamar("ver_gabarito", { ano: 2023, numero: 140 });
+  expect(resultado.isError).toBeFalsy();
+  expect(textoDe(resultado)).toContain("B) Alternativa B");
+  expect(textoDe(resultado)).toContain("questão 140 do ENEM 2023");
+  expect(await historico.ler()).toEqual([]);
+  expect(textoDe(await chamar("ver_desempenho"))).toContain("ainda não respondeu");
+});
+
+test("ver_gabarito também exige o idioma nas questões de língua estrangeira", async () => {
+  const { chamar } = await montar();
+  const semIdioma = await chamar("ver_gabarito", { ano: 2023, numero: 3 });
+  expect(semIdioma.isError).toBe(true);
+  expect(textoDe(semIdioma)).toContain("idioma");
+
+  expect(textoDe(await chamar("ver_gabarito", { ano: 2023, numero: 3, idioma: "espanhol" }))).toContain("B) Alternativa B");
+  const ingles = textoDe(await chamar("ver_gabarito", { ano: 2023, numero: 3, idioma: "ingles" }));
+  expect(ingles).toContain("C) Alternativa C");
+  expect(ingles).toContain("em inglês");
+});
+
+test("ver_gabarito de questão anulada dá o mesmo erro explicativo", async () => {
+  const { chamar } = await montar();
+  const resultado = await chamar("ver_gabarito", { ano: 2023, numero: 34 });
+  expect(resultado.isError).toBe(true);
+  expect(textoDe(resultado)).toContain("anulada");
 });

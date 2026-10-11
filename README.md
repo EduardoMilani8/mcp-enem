@@ -1,5 +1,6 @@
 # mcp-enem
 
+[![npm](https://img.shields.io/npm/v/mcp-enem)](https://www.npmjs.com/package/mcp-enem)
 [![Verificar](https://github.com/EduardoMilani8/mcp-enem/actions/workflows/verificar.yml/badge.svg)](https://github.com/EduardoMilani8/mcp-enem/actions/workflows/verificar.yml)
 
 Servidor MCP para estudar para o ENEM com o Claude: questões reais da prova,
@@ -18,23 +19,13 @@ Com o servidor conectado, você conversa normalmente:
 
 ## Instalação
 
-Precisa do [Node.js](https://nodejs.org) 20 ou superior. O pacote ainda não
-está no npm, então por enquanto a instalação é a partir do código:
-
-```bash
-git clone https://github.com/EduardoMilani8/mcp-enem.git
-cd mcp-enem
-npm install
-npm run build
-```
-
-Depois conecte o servidor, trocando `/caminho/para` pela pasta onde você
-clonou o projeto.
+Precisa do [Node.js](https://nodejs.org) 20 ou superior. Não é preciso baixar
+nada à mão: o `npx` busca o pacote no npm na primeira vez.
 
 **Claude Code**
 
 ```bash
-claude mcp add mcp-enem -- node /caminho/para/mcp-enem/dist/servidor.js
+claude mcp add mcp-enem -- npx -y mcp-enem
 ```
 
 **Claude Desktop**
@@ -45,8 +36,8 @@ Em Configurações → Desenvolvedor → Editar configuração, acrescente:
 {
   "mcpServers": {
     "mcp-enem": {
-      "command": "node",
-      "args": ["/caminho/para/mcp-enem/dist/servidor.js"]
+      "command": "npx",
+      "args": ["-y", "mcp-enem"]
     }
   }
 }

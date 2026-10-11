@@ -8,6 +8,53 @@ export const NOMES_DAS_AREAS: Record<Area, string> = {
   matematica: "Matemática e suas Tecnologias",
 };
 
+/**
+ * As áreas do ENEM são largas demais para orientar o estudo ("Ciências da
+ * Natureza" junta três matérias). A API não classifica as questões por
+ * matéria; quem informa é o cliente, na hora da correção.
+ */
+export const MATERIAS = [
+  "portugues",
+  "literatura",
+  "ingles",
+  "espanhol",
+  "artes",
+  "educacao-fisica",
+  "historia",
+  "geografia",
+  "filosofia",
+  "sociologia",
+  "fisica",
+  "quimica",
+  "biologia",
+  "matematica",
+] as const;
+export type Materia = (typeof MATERIAS)[number];
+
+export const NOMES_DAS_MATERIAS: Record<Materia, string> = {
+  portugues: "Língua Portuguesa",
+  literatura: "Literatura",
+  ingles: "Inglês",
+  espanhol: "Espanhol",
+  artes: "Artes",
+  "educacao-fisica": "Educação Física",
+  historia: "História",
+  geografia: "Geografia",
+  filosofia: "Filosofia",
+  sociologia: "Sociologia",
+  fisica: "Física",
+  quimica: "Química",
+  biologia: "Biologia",
+  matematica: "Matemática",
+};
+
+export const MATERIAS_POR_AREA: Record<Area, readonly Materia[]> = {
+  linguagens: ["portugues", "literatura", "ingles", "espanhol", "artes", "educacao-fisica"],
+  "ciencias-humanas": ["historia", "geografia", "filosofia", "sociologia"],
+  "ciencias-natureza": ["fisica", "quimica", "biologia"],
+  matematica: ["matematica"],
+};
+
 export const IDIOMAS = ["ingles", "espanhol"] as const;
 export type Idioma = (typeof IDIOMAS)[number];
 

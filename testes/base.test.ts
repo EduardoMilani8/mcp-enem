@@ -3,7 +3,16 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { diretorioDeDados } from "../src/config.js";
-import { chaveDaQuestao, ErroEnem, paraPublica, type Questao } from "../src/enem/tipos.js";
+import {
+  AREAS,
+  chaveDaQuestao,
+  ErroEnem,
+  MATERIAS,
+  MATERIAS_POR_AREA,
+  NOMES_DAS_MATERIAS,
+  paraPublica,
+  type Questao,
+} from "../src/enem/tipos.js";
 import { VERSAO } from "../src/versao.js";
 
 const QUESTAO: Questao = {
@@ -57,4 +66,12 @@ test("expande o ~ de MCP_ENEM_DIR, que num JSON de configuração chega literal"
 test("a versão do servidor é a do package.json", () => {
   const pacote = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
   expect(VERSAO).toBe(pacote.version);
+});
+
+test("cada matéria pertence a exatamente uma área e tem nome", () => {
+  const todas = AREAS.flatMap((area) => MATERIAS_POR_AREA[area]);
+  expect([...todas].sort()).toEqual([...MATERIAS].sort());
+  expect(new Set(todas).size).toBe(todas.length);
+  for (const materia of MATERIAS) expect(NOMES_DAS_MATERIAS[materia].length).toBeGreaterThan(0);
+  expect(MATERIAS_POR_AREA["ciencias-natureza"]).toEqual(["fisica", "quimica", "biologia"]);
 });

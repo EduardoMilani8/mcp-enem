@@ -136,3 +136,24 @@ test("removerUltima não deixa arquivo temporário para trás", async () => {
   await historico.removerUltima();
   expect(await readdir(pasta)).toEqual(["historico.jsonl"]);
 });
+
+test("guarda a matéria e o assunto da tentativa quando informados", async () => {
+  const historico = new Historico(join(await pastaTemporaria(), "historico.jsonl"));
+  await historico.registrar(tentativa({ numero: 1, materia: "matematica", assunto: "logaritmos" }));
+  await historico.registrar(tentativa({ numero: 2 }));
+  const lidas = await historico.ler();
+  expect(lidas[0]).toMatchObject({ numero: 1, materia: "matematica", assunto: "logaritmos" });
+  expect(lidas[1]?.materia).toBeUndefined();
+  expect(lidas[1]?.assunto).toBeUndefined();
+});
+
+test("matéria desconhecida numa linha não descarta a tentativa", async () => {
+  const caminho = join(await pastaTemporaria(), "historico.jsonl");
+  const linha = { ...tentativa({ numero: 7 }), materia: "astrologia", assunto: "signos" };
+  await appendFile(caminho, `${JSON.stringify(linha)}\n`, "utf8");
+  const lidas = await new Historico(caminho).ler();
+  expect(lidas).toHaveLength(1);
+  expect(lidas[0]?.numero).toBe(7);
+  expect(lidas[0]?.materia).toBeUndefined();
+  expect(lidas[0]?.assunto).toBe("signos");
+});

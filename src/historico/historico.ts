@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFile, mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
-import { AREAS, IDIOMAS, LETRAS } from "../enem/tipos.js";
+import { AREAS, IDIOMAS, LETRAS, MATERIAS } from "../enem/tipos.js";
 import { log } from "../log.js";
 
 const esquemaDaTentativa = z.object({
@@ -14,6 +14,10 @@ const esquemaDaTentativa = z.object({
   resposta: z.enum(LETRAS),
   correta: z.enum(LETRAS),
   acertou: z.boolean(),
+  // Opcionais: as tentativas antigas não têm, e nem toda correção informa.
+  // Um valor desconhecido é ignorado em vez de descartar a tentativa inteira.
+  materia: z.enum(MATERIAS).optional().catch(undefined),
+  assunto: z.string().optional().catch(undefined),
 });
 
 export type Tentativa = z.infer<typeof esquemaDaTentativa>;

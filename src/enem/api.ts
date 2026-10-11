@@ -1,4 +1,5 @@
 import { log } from "../log.js";
+import { IDENTIFICACAO } from "../versao.js";
 import { converterQuestao, type QuestaoApi } from "./converter.js";
 import { chaveDaQuestao, ErroEnem, IDIOMAS, type Idioma, type Prova, type Questao } from "./tipos.js";
 
@@ -129,7 +130,7 @@ export class ClienteApi {
       try {
         resposta = await this.buscar(this.urlBase + caminho, {
           signal: AbortSignal.timeout(this.tempoLimiteMs),
-          headers: { accept: "application/json" },
+          headers: { accept: "application/json", "user-agent": IDENTIFICACAO },
         });
       } catch {
         throw new ErroEnem(

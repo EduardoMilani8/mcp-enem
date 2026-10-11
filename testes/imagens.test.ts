@@ -77,3 +77,13 @@ test("devolve null para imagem vazia ou grande demais", async () => {
   const grande = new CarregadorDeImagens(pasta, { buscar: buscadorDe(BYTES_PNG).buscar, limiteBytes: BYTES_PNG.length - 1 });
   expect(await grande.carregar("https://enem.dev/grande.png")).toBeNull();
 });
+
+test("identifica-se ao baixar imagens", async () => {
+  const cabecalhos: Headers[] = [];
+  const buscar: typeof fetch = async (_entrada, init) => {
+    cabecalhos.push(new Headers(init?.headers));
+    return new Response(new Uint8Array(BYTES_PNG));
+  };
+  await new CarregadorDeImagens(await pastaTemporaria(), { buscar }).carregar("https://enem.dev/a.png");
+  expect(cabecalhos[0]?.get("user-agent")).toMatch(/^mcp-enem\//);
+});

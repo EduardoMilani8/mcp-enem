@@ -147,3 +147,14 @@ test("erro 500 e corpo que não é JSON viram ErroEnem", async () => {
   const html = new ClienteApi({ buscar: async () => new Response("<html>"), intervaloMs: 0 });
   await expect(html.listarProvas()).rejects.toMatchObject({ codigo: "resposta_invalida" });
 });
+
+test("identifica-se para a API com o nome e a versão do projeto", async () => {
+  const api = criarApiFalsa([{ ano: 2023, idiomas: [], questoes: [] }]);
+  const cabecalhos: Headers[] = [];
+  const buscar: typeof fetch = async (entrada, init) => {
+    cabecalhos.push(new Headers(init?.headers));
+    return api.buscar(entrada, init);
+  };
+  await new ClienteApi({ buscar, intervaloMs: 0 }).listarProvas();
+  expect(cabecalhos[0]?.get("user-agent")).toMatch(/^mcp-enem\/\d+\.\d+\.\d+ \(\+https:\/\/github\.com\/EduardoMilani8\/mcp-enem\)$/);
+});

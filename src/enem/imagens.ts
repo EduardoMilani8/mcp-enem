@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { log } from "../log.js";
+import { IDENTIFICACAO } from "../versao.js";
 
 export interface ImagemCarregada {
   /** Conteúdo em base64. */
@@ -70,7 +71,10 @@ export class CarregadorDeImagens {
     }
 
     try {
-      const resposta = await this.buscar(url, { signal: AbortSignal.timeout(this.tempoLimiteMs) });
+      const resposta = await this.buscar(url, {
+        signal: AbortSignal.timeout(this.tempoLimiteMs),
+        headers: { "user-agent": IDENTIFICACAO },
+      });
       if (!resposta.ok) return null;
       const bytes = Buffer.from(await resposta.arrayBuffer());
       if (bytes.length === 0 || bytes.length > this.limiteBytes) return null;

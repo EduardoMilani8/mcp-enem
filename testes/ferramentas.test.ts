@@ -16,6 +16,8 @@ interface OpcoesDeMontagem {
   aleatorio?: () => number;
   buscarImagem?: typeof fetch;
   prazoDasImagensMs?: number;
+  /** Provas a mais na API falsa, além das de 2022 e 2023. */
+  anosExtras?: number[];
 }
 
 async function montar(opcoes: OpcoesDeMontagem = {}) {
@@ -27,6 +29,11 @@ async function montar(opcoes: OpcoesDeMontagem = {}) {
       questoes: questoesDaProva(2022, ["espanhol", "ingles"], { files: ["https://enem.dev/2022/figura.png"] }),
     },
     { ano: 2023, idiomas: ["espanhol", "ingles"], questoes: questoesDaProva(2023) },
+    ...(opcoes.anosExtras ?? []).map((ano) => ({
+      ano,
+      idiomas: ["espanhol", "ingles"],
+      questoes: questoesDaProva(ano),
+    })),
   ]);
   let semRede = false;
   const buscar: typeof fetch = async (entrada, init) => {
@@ -377,4 +384,45 @@ test("revisar_erros pula a questão que não carrega e completa com as seguintes
   const resultado = await chamar("revisar_erros", { quantidade: 1 });
   expect(resultado.isError).toBeFalsy();
   expect(numerosDe(resultado)).toEqual([141]);
+});
+
+test("buscar_questoes com palavras-chave devolve só as questões que as contêm", async () => {
+  const { chamar } = await montar();
+  const resultado = await chamar("buscar_questoes", { ano: 2023, palavras_chave: ["ENUNCIADO 140"] });
+  expect(numerosDe(resultado)).toEqual([140]);
+  expect(JSON.stringify(resultado)).not.toMatch(VAZAMENTO);
+});
+
+test("sem ano, a busca por palavra-chave procura em mais de uma prova", async () => {
+  const { chamar } = await montar();
+  const resultado = await chamar("buscar_questoes", { palavras_chave: ["nada disso", "enunciado 140"] });
+  expect(textoDe(resultado).match(/ENEM 2022 · Questão 140/g)).toHaveLength(1);
+  expect(textoDe(resultado).match(/ENEM 2023 · Questão 140/g)).toHaveLength(1);
+  expect(numerosDe(resultado)).toEqual([140, 140]);
+});
+
+test("palavra-chave sem resultado explica que a busca é pelo texto e sugere variações", async () => {
+  const { chamar } = await montar();
+  const resultado = await chamar("buscar_questoes", { ano: 2023, palavras_chave: ["estequiometria"] });
+  expect(resultado.isError).toBeFalsy();
+  expect(numerosDe(resultado)).toEqual([]);
+  expect(textoDe(resultado)).toContain("palavras-chave");
+});
+
+test("avisa quando a busca por palavra-chave ainda não olhou todas as provas", async () => {
+  const { chamar } = await montar({ anosExtras: [2019, 2020, 2021] });
+  const primeira = await chamar("buscar_questoes", { palavras_chave: ["estequiometria"] });
+  expect(textoDe(primeira)).toContain("2 de 5 provas");
+
+  const segunda = await chamar("buscar_questoes", { palavras_chave: ["estequiometria"] });
+  expect(textoDe(segunda)).toContain("4 de 5 provas");
+
+  const terceira = await chamar("buscar_questoes", { palavras_chave: ["estequiometria"] });
+  expect(textoDe(terceira)).not.toContain("de 5 provas");
+});
+
+test("palavra-chave curta demais ou lista vazia são recusadas", async () => {
+  const { chamar } = await montar();
+  expect((await chamar("buscar_questoes", { palavras_chave: ["a"] })).isError).toBe(true);
+  expect((await chamar("buscar_questoes", { palavras_chave: [] })).isError).toBe(true);
 });

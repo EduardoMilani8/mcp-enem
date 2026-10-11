@@ -153,7 +153,8 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
     {
       description:
         "Sorteia questões oficiais do ENEM para o aluno responder. A resposta certa NÃO é devolvida: " +
-        "depois que o aluno responder, use corrigir_resposta. Apresente uma questão por vez.",
+        "depois que o aluno responder, use corrigir_resposta. Apresente uma questão por vez. " +
+        "Os únicos filtros são área, ano e palavras-chave no texto; não existe filtro por matéria ou tema.",
       inputSchema: {
         quantidade: z.number().int().min(1).max(20).default(5).describe("Quantas questões sortear (1 a 20)."),
         area: campoArea.optional(),
@@ -161,14 +162,29 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
         idioma: campoIdioma.default("ingles"),
         apenas_texto: z.boolean().default(false).describe("Se verdadeiro, pula questões que têm imagem."),
         ineditas: z.boolean().default(true).describe("Se verdadeiro, evita questões que o aluno já respondeu."),
+        palavras_chave: z
+          .array(z.string().trim().min(2).max(60))
+          .min(1)
+          .max(8)
+          .optional()
+          .describe(
+            "Para estudar um assunto: devolve só questões cujo texto contém pelo menos uma destas palavras ou " +
+              "expressões (sem diferenciar acentos nem maiúsculas). É busca por palavra no texto, não por tema: " +
+              'inclua variações que costumam aparecer no enunciado, por exemplo ["logaritmo", "log"] ou ' +
+              '["probabilidade", "chance", "sorteio"].',
+          ),
       },
     },
-    async ({ quantidade, area, ano, idioma, apenas_texto, ineditas }) =>
+    async ({ quantidade, area, ano, idioma, apenas_texto, ineditas, palavras_chave }) =>
       protegido(async () => {
         const avisos: string[] = [];
         const excluir = ineditas ? chavesRespondidas(await historico.ler()) : new Set<string>();
 
-        const filtro = { area, idioma, apenasTexto: apenas_texto, excluir };
+        const filtro = { area, idioma, apenasTexto: apenas_texto, excluir, palavrasChave: palavras_chave };
+        const dicaDePalavras = palavras_chave
+          ? " A busca por palavras-chave procura as palavras no texto da questão, não o tema: tente variações " +
+            "ou termos que costumam aparecer no enunciado."
+          : "";
 
         if (ano !== undefined) {
           const candidatas = filtrar(await repositorio.questoesDoAno(ano), filtro);
@@ -176,7 +192,8 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
           if (escolhidas.length === 0) {
             return texto(
               `Não há questões do ENEM ${ano} com esses filtros. ` +
-                "Tente outro ano ou outra área, ou use ineditas=false para repetir questões já respondidas.",
+                "Tente outro ano ou outra área, ou use ineditas=false para repetir questões já respondidas." +
+                dicaDePalavras,
             );
           }
           if (escolhidas.length < quantidade) {
@@ -222,15 +239,24 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
         if (consultados.length === 0 && falhaDeRede) throw falhaDeRede;
         if (falhaDeRede) avisos.push("Não consegui baixar uma prova nova; usei as que já estavam guardadas.");
         const provas = [...consultados].sort((a, b) => a - b).join(", ");
+        // Assunto específico rende poucas questões por prova; vale dizer que ainda há onde procurar.
+        const faltaProcurar =
+          palavras_chave && consultados.length < disponiveis.length
+            ? ` A busca olhou ${consultados.length} de ${disponiveis.length} provas; ` +
+              "chame de novo com os mesmos parâmetros para procurar nas demais."
+            : "";
         if (escolhidas.length === 0) {
           return texto(
             `Não há questões com esses filtros nas provas consultadas (${provas}). ` +
-              "Tente outra área, informe um ano específico, ou use ineditas=false para repetir questões já respondidas.",
+              "Tente outra área, informe um ano específico, ou use ineditas=false para repetir questões já respondidas." +
+              dicaDePalavras +
+              faltaProcurar,
           );
         }
         if (escolhidas.length < quantidade) {
           avisos.push(
-            `Só havia ${escolhidas.length} de ${quantidade} questões com esses filtros nas provas consultadas (${provas}).`,
+            `Só havia ${escolhidas.length} de ${quantidade} questões com esses filtros nas provas consultadas (${provas}).` +
+              faltaProcurar,
           );
         }
         escolhidas.sort((a, b) => a.ano - b.ano || a.numero - b.numero);

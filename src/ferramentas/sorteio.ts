@@ -6,6 +6,43 @@ export interface Filtro {
   apenasTexto: boolean;
   /** Chaves (ver chaveDaQuestao) das questões que não devem aparecer. */
   excluir: ReadonlySet<string>;
+  /** Se informadas, só passam questões cujo texto contém pelo menos uma delas. */
+  palavrasChave?: readonly string[];
+}
+
+/** Minúsculas e sem acentos, para comparar texto sem depender da grafia. */
+function normalizar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+/**
+ * Monta o teste de palavras-chave uma vez só, para aplicar a muitas questões.
+ * Cada palavra-chave precisa aparecer no começo de uma palavra do texto:
+ * "log" acha "logaritmo" e "log 2", mas não "biologia".
+ */
+function criarBuscador(palavrasChave: readonly string[]): (questao: QuestaoPublica) => boolean {
+  const padroes = palavrasChave
+    .map((palavra) => normalizar(palavra).trim())
+    .filter((termo) => termo !== "")
+    .map((termo) => {
+      const literal = termo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      return new RegExp(`(^|[^a-z0-9])${literal}`);
+    });
+  return (questao) => {
+    const texto = normalizar(
+      [questao.contexto, questao.enunciado, ...questao.alternativas.map((a) => a.texto)]
+        .filter((parte) => parte !== null)
+        .join("\n"),
+    );
+    return padroes.some((padrao) => padrao.test(texto));
+  };
+}
+
+export function contemPalavraChave(questao: QuestaoPublica, palavrasChave: readonly string[]): boolean {
+  return criarBuscador(palavrasChave)(questao);
 }
 
 const IMAGEM_EM_MARKDOWN = /!\[[^\]]*\]\(/;
@@ -19,13 +56,16 @@ export function temImagem(questao: QuestaoPublica): boolean {
 }
 
 export function filtrar(questoes: Questao[], filtro: Filtro): Questao[] {
+  const temPalavraChave =
+    filtro.palavrasChave && filtro.palavrasChave.length > 0 ? criarBuscador(filtro.palavrasChave) : () => true;
   return questoes.filter(
     (q) =>
       !q.incompleta &&
       (filtro.area === undefined || q.area === filtro.area) &&
       (q.idioma === null || q.idioma === filtro.idioma) &&
       (!filtro.apenasTexto || !temImagem(q)) &&
-      !filtro.excluir.has(chaveDaQuestao(q)),
+      !filtro.excluir.has(chaveDaQuestao(q)) &&
+      temPalavraChave(q),
   );
 }
 

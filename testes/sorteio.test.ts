@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { converterQuestao } from "../src/enem/converter.js";
 import type { Questao } from "../src/enem/tipos.js";
-import { escolherAno, filtrar, sortear, temImagem, type Filtro } from "../src/ferramentas/sorteio.js";
+import { contemPalavraChave, escolherAno, filtrar, sortear, temImagem, type Filtro } from "../src/ferramentas/sorteio.js";
 import { questaoApi } from "./apoio.js";
 
 function questao(numero: number, extras: Parameters<typeof questaoApi>[1] = {}): Questao {
@@ -76,4 +76,45 @@ test("escolherAno sempre devolve um ano disponível", () => {
 test("escolherAno devolve o único ano quando só há um", () => {
   expect(escolherAno([2023], [], () => 0.9)).toBe(2023);
   expect(escolherAno([2023], [2023], () => 0.1)).toBe(2023);
+});
+
+test("palavra-chave ignora acentos e maiúsculas", () => {
+  const q = questao(1, { context: "A função LOGARÍTMICA descreve o fenômeno." });
+  expect(contemPalavraChave(q, ["logaritm"])).toBe(true);
+  expect(contemPalavraChave(q, ["Função Logarítmica"])).toBe(true);
+  expect(contemPalavraChave(q, ["fenomeno"])).toBe(true);
+});
+
+test("palavra-chave casa com o começo de uma palavra, não com o meio", () => {
+  const biologia = questao(1, { context: "Um estudo de biologia e um catálogo." });
+  expect(contemPalavraChave(biologia, ["log"])).toBe(false);
+  const conta = questao(2, { context: "Considere log 2 = 0,3." });
+  expect(contemPalavraChave(conta, ["log"])).toBe(true);
+  expect(contemPalavraChave(questao(3, { context: "Calcule (log x)." }), ["log"])).toBe(true);
+});
+
+test("basta uma das palavras-chave aparecer", () => {
+  const q = questao(1, { context: "A média aritmética das notas." });
+  expect(contemPalavraChave(q, ["mediana", "média"])).toBe(true);
+  expect(contemPalavraChave(q, ["mediana", "moda"])).toBe(false);
+});
+
+test("palavra-chave também procura no enunciado e nas alternativas", () => {
+  const noEnunciado = questao(1, { alternativesIntroduction: "Qual é a probabilidade?" });
+  expect(contemPalavraChave(noEnunciado, ["probabilidade"])).toBe(true);
+  const naAlternativa = questao(2, { alternatives: [{ letter: "A", text: "Fotossíntese", file: null }] });
+  expect(contemPalavraChave(naAlternativa, ["fotossintese"])).toBe(true);
+});
+
+test("expressão com espaços e símbolos é tratada como texto comum", () => {
+  const q = questao(1, { context: "Uma progressão\naritmética de razão 2 (PA)." });
+  expect(contemPalavraChave(q, ["progressão aritmética"])).toBe(true);
+  expect(contemPalavraChave(q, ["(pa)"])).toBe(true);
+  expect(contemPalavraChave(q, ["   "])).toBe(false);
+});
+
+test("filtrar aplica as palavras-chave quando informadas", () => {
+  const lista = [questao(1, { context: "Sobre logaritmos." }), questao(2, { context: "Sobre geometria." })];
+  expect(filtrar(lista, { ...SEM_FILTRO, palavrasChave: ["logaritmo"] }).map((q) => q.numero)).toEqual([1]);
+  expect(filtrar(lista, { ...SEM_FILTRO, palavrasChave: [] }).map((q) => q.numero)).toEqual([1, 2]);
 });

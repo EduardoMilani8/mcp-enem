@@ -8,6 +8,10 @@ import {
   ErroEnem,
   IDIOMAS,
   LETRAS,
+  MATERIAS,
+  MATERIAS_POR_AREA,
+  NOMES_DAS_AREAS,
+  NOMES_DAS_MATERIAS,
   paraPublica,
   type Idioma,
   type Questao,
@@ -48,6 +52,7 @@ type Bloco = CallToolResult["content"][number];
 const campoAno = z.number().int().min(2009).describe("Ano da prova, por exemplo 2023.");
 const campoNumero = z.number().int().min(1).max(200).describe("Número da questão na prova.");
 const campoArea = z.enum(AREAS).describe("Área do conhecimento.");
+const campoMateria = z.enum(MATERIAS).describe("Matéria escolar.");
 const campoIdioma = z
   .enum(IDIOMAS)
   .describe("Idioma das questões de língua estrangeira. Só afeta essas questões.");
@@ -334,11 +339,30 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
           .enum(["A", "B", "C", "D", "E", "a", "b", "c", "d", "e"])
           .describe("A alternativa que o aluno escolheu, de A a E."),
         idioma: campoIdiomaDaQuestao,
+        materia: campoMateria
+          .optional()
+          .describe(
+            "A matéria da questão. Informe sempre: você a identifica pelo enunciado, e é ela que permite mostrar " +
+              "o desempenho por matéria em vez de só pelas quatro grandes áreas.",
+          ),
+        assunto: z
+          .string()
+          .trim()
+          .min(2)
+          .max(60)
+          .optional()
+          .describe(
+            "O assunto específico da questão, em poucas palavras e no plural quando couber (por exemplo " +
+              '"logaritmos", "estequiometria", "Era Vargas"). Informe sempre, repetindo a mesma grafia para o mesmo assunto.',
+          ),
       },
     },
-    async ({ ano, numero, resposta, idioma }) =>
+    async ({ ano, numero, resposta, idioma, materia, assunto }) =>
       protegido(async () => {
         const questao = await questaoComGabarito(ano, numero, idioma);
+        // Uma matéria de outra área é engano de quem classificou; não é motivo
+        // para deixar de corrigir, só para não gravar a classificação errada.
+        const materiaValida = materia !== undefined && MATERIAS_POR_AREA[questao.area].includes(materia);
         const marcada = LETRAS.find((letra) => letra === resposta.toUpperCase());
         if (!marcada) return falha("A resposta deve ser uma letra de A a E.");
         const acertou = marcada === questao.gabarito;
@@ -351,13 +375,26 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
           resposta: marcada,
           correta: questao.gabarito,
           acertou,
+          ...(materiaValida ? { materia } : {}),
+          ...(assunto ? { assunto } : {}),
         });
         const gabarito = textoDoGabarito(questao);
         const qual = questao.idioma ? ` (questão ${questao.numero}${emQualIdioma(questao)})` : "";
+        const classificacao = [materiaValida ? NOMES_DAS_MATERIAS[materia] : null, assunto ?? null].filter(
+          (parte) => parte !== null,
+        );
+        const registro = classificacao.length > 0 ? ` Registrado em: ${classificacao.join(", ")}.` : "";
+        const materiaRecusada =
+          materia !== undefined && !materiaValida
+            ? ` A matéria "${NOMES_DAS_MATERIAS[materia]}" não foi registrada: ela não pertence à área desta ` +
+              `questão (${NOMES_DAS_AREAS[questao.area]}).`
+            : "";
         return texto(
-          acertou
+          (acertou
             ? `Resposta correta${qual}. Gabarito oficial: ${gabarito}`
-            : `Resposta incorreta${qual}. O aluno marcou ${marcada}. Gabarito oficial: ${gabarito}`,
+            : `Resposta incorreta${qual}. O aluno marcou ${marcada}. Gabarito oficial: ${gabarito}`) +
+            registro +
+            materiaRecusada,
         );
       }),
   );
@@ -402,19 +439,22 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
   servidor.registerTool(
     "ver_desempenho",
     {
-      description: "Mostra os acertos e erros do aluno, no geral, nos últimos 7 dias e por área do conhecimento.",
+      description:
+        "Mostra os acertos e erros do aluno: no geral, nos últimos 7 dias, por área, por matéria e os assuntos " +
+        "em que ele mais erra (matéria e assunto só aparecem para as tentativas em que foram informados).",
       inputSchema: {
         area: campoArea.optional(),
+        materia: campoMateria.optional(),
         dias: z.number().int().min(1).max(3650).optional().describe("Considera só os últimos N dias."),
       },
     },
-    async ({ area, dias }) =>
+    async ({ area, materia, dias }) =>
       protegido(async () => {
         const tentativas = await historico.ler();
         if (tentativas.length === 0) {
           return texto("O aluno ainda não respondeu nenhuma questão. Use buscar_questoes para começar.");
         }
-        return texto(formatarDesempenho(calcularDesempenho(tentativas, { area, dias, agora: agora() })));
+        return texto(formatarDesempenho(calcularDesempenho(tentativas, { area, materia, dias, agora: agora() })));
       }),
   );
 
@@ -427,11 +467,14 @@ export function registrarFerramentas(servidor: McpServer, dependencias: Dependen
       inputSchema: {
         quantidade: z.number().int().min(1).max(20).default(5).describe("Quantas questões devolver (1 a 20)."),
         area: campoArea.optional(),
+        materia: campoMateria.optional().describe("Só os erros registrados nesta matéria."),
       },
     },
-    async ({ quantidade, area }) =>
+    async ({ quantidade, area, materia }) =>
       protegido(async () => {
-        const pendentes = errosPendentes(await historico.ler()).filter((t) => area === undefined || t.area === area);
+        const pendentes = errosPendentes(await historico.ler()).filter(
+          (t) => (area === undefined || t.area === area) && (materia === undefined || t.materia === materia),
+        );
         const questoes: QuestaoPublica[] = [];
         let falhaDeCarga: ErroEnem | null = null;
         for (const pendente of pendentes) {

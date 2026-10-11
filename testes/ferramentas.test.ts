@@ -477,3 +477,61 @@ test("desfazer_ultima_tentativa sem histórico explica em vez de dar erro", asyn
   expect(resultado.isError).toBeFalsy();
   expect(textoDe(resultado)).toContain("Não há tentativas");
 });
+
+test("corrigir_resposta registra a matéria e o assunto informados", async () => {
+  const { chamar, historico } = await montar();
+  const resultado = await chamar("corrigir_resposta", {
+    ano: 2023,
+    numero: 100,
+    resposta: "C",
+    materia: "quimica",
+    assunto: "estequiometria",
+  });
+  expect(textoDe(resultado)).toContain("Resposta incorreta");
+  expect(textoDe(resultado)).toContain("Química");
+  expect(textoDe(resultado)).toContain("estequiometria");
+  expect((await historico.ler())[0]).toMatchObject({ numero: 100, materia: "quimica", assunto: "estequiometria" });
+});
+
+test("matéria que não é da área da questão é ignorada, sem impedir a correção", async () => {
+  const { chamar, historico } = await montar();
+  const resultado = await chamar("corrigir_resposta", { ano: 2023, numero: 140, resposta: "B", materia: "fisica" });
+  expect(resultado.isError).toBeFalsy();
+  expect(textoDe(resultado)).toContain("Resposta correta");
+  expect(textoDe(resultado)).toContain("não pertence");
+  const [gravada] = await historico.ler();
+  expect(gravada?.acertou).toBe(true);
+  expect(gravada?.materia).toBeUndefined();
+});
+
+test("matéria fora da lista é recusada", async () => {
+  const { chamar, historico } = await montar();
+  const resultado = await chamar("corrigir_resposta", { ano: 2023, numero: 140, resposta: "B", materia: "astrologia" });
+  expect(resultado.isError).toBe(true);
+  expect(await historico.ler()).toEqual([]);
+});
+
+test("ver_desempenho mostra e filtra por matéria", async () => {
+  const { chamar } = await montar();
+  await chamar("corrigir_resposta", { ano: 2023, numero: 100, resposta: "C", materia: "quimica", assunto: "estequiometria" });
+  await chamar("corrigir_resposta", { ano: 2023, numero: 101, resposta: "B", materia: "quimica", assunto: "estequiometria" });
+  await chamar("corrigir_resposta", { ano: 2023, numero: 102, resposta: "B", materia: "fisica", assunto: "cinemática" });
+
+  const geral = textoDe(await chamar("ver_desempenho"));
+  expect(geral).toContain("- Química: 1 de 2 (50%)");
+  expect(geral).toContain("- Física: 1 de 1 (100%)");
+  expect(geral).toContain("- estequiometria: 1 erro(s) em 2 tentativa(s)");
+
+  const soFisica = textoDe(await chamar("ver_desempenho", { materia: "fisica" }));
+  expect(soFisica).toContain("Geral: 1 de 1 (100%)");
+  expect(soFisica).not.toContain("Química");
+});
+
+test("revisar_erros filtra por matéria", async () => {
+  const { chamar } = await montar();
+  await chamar("corrigir_resposta", { ano: 2023, numero: 100, resposta: "C", materia: "quimica" });
+  await chamar("corrigir_resposta", { ano: 2023, numero: 102, resposta: "C", materia: "fisica" });
+  expect(numerosDe(await chamar("revisar_erros", { materia: "fisica" }))).toEqual([102]);
+  expect(numerosDe(await chamar("revisar_erros"))).toEqual([100, 102]);
+  expect(textoDe(await chamar("revisar_erros", { materia: "biologia" }))).toContain("Nenhum erro pendente");
+});

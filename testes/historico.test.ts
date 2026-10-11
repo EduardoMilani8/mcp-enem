@@ -157,3 +157,49 @@ test("matéria desconhecida numa linha não descarta a tentativa", async () => {
   expect(lidas[0]?.materia).toBeUndefined();
   expect(lidas[0]?.assunto).toBe("signos");
 });
+
+test("desempenho por matéria conta só as tentativas que têm matéria", () => {
+  const desempenho = calcularDesempenho([
+    tentativa({ numero: 100, area: "ciencias-natureza", materia: "quimica" }),
+    errada({ numero: 101, area: "ciencias-natureza", materia: "quimica" }),
+    errada({ numero: 102, area: "ciencias-natureza", materia: "fisica" }),
+    tentativa({ numero: 140 }),
+  ]);
+  expect(desempenho.porMateria.quimica).toEqual({ total: 2, acertos: 1, percentual: 50 });
+  expect(desempenho.porMateria.fisica).toEqual({ total: 1, acertos: 0, percentual: 0 });
+  expect(desempenho.porMateria.matematica).toBeUndefined();
+  expect(desempenho.semMateria).toBe(1);
+});
+
+test("filtra o desempenho por matéria", () => {
+  const desempenho = calcularDesempenho(
+    [
+      tentativa({ numero: 100, area: "ciencias-natureza", materia: "quimica" }),
+      errada({ numero: 102, area: "ciencias-natureza", materia: "fisica" }),
+      tentativa({ numero: 140 }),
+    ],
+    { materia: "quimica" },
+  );
+  expect(desempenho.geral).toEqual({ total: 1, acertos: 1, percentual: 100 });
+  expect(desempenho.semMateria).toBe(0);
+});
+
+test("lista os assuntos com mais erros, juntando grafias iguais", () => {
+  const desempenho = calcularDesempenho([
+    errada({ numero: 1, assunto: "Logaritmos" }),
+    errada({ numero: 2, assunto: "  logaritmos " }),
+    tentativa({ numero: 3, assunto: "logaritmos" }),
+    errada({ numero: 4, assunto: "geometria plana" }),
+    tentativa({ numero: 5, assunto: "porcentagem" }),
+    errada({ numero: 6 }),
+  ]);
+  expect(desempenho.assuntosComMaisErros).toEqual([
+    { assunto: "Logaritmos", erros: 2, total: 3 },
+    { assunto: "geometria plana", erros: 1, total: 1 },
+  ]);
+});
+
+test("mostra no máximo cinco assuntos com mais erros", () => {
+  const tentativas = ["a1", "b2", "c3", "d4", "e5", "f6", "g7"].map((assunto, i) => errada({ numero: i + 1, assunto }));
+  expect(calcularDesempenho(tentativas).assuntosComMaisErros).toHaveLength(5);
+});

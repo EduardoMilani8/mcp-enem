@@ -1,4 +1,4 @@
-import { appendFile } from "node:fs/promises";
+import { appendFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { calcularDesempenho, chavesRespondidas, errosPendentes } from "../src/historico/estatisticas.js";
@@ -101,4 +101,38 @@ test("uma linha cortada no fim do arquivo não leva junto a tentativa seguinte",
   await historico.registrar(tentativa({ numero: 2 }));
   await historico.registrar(tentativa({ numero: 3 }));
   expect((await historico.ler()).map((t) => t.numero)).toEqual([1, 2, 3]);
+});
+
+test("removerUltima tira só a tentativa mais recente e a devolve", async () => {
+  const historico = new Historico(join(await pastaTemporaria(), "historico.jsonl"));
+  await historico.registrar(tentativa({ numero: 1 }));
+  await historico.registrar(errada({ numero: 2 }));
+  await historico.registrar(tentativa({ numero: 3 }));
+
+  expect((await historico.removerUltima())?.numero).toBe(3);
+  expect((await historico.ler()).map((t) => t.numero)).toEqual([1, 2]);
+
+  await historico.registrar(tentativa({ numero: 4 }));
+  expect((await historico.ler()).map((t) => t.numero)).toEqual([1, 2, 4]);
+});
+
+test("removerUltima devolve null quando não há o que remover", async () => {
+  const pasta = await pastaTemporaria();
+  const semArquivo = new Historico(join(pasta, "nao-existe.jsonl"));
+  expect(await semArquivo.removerUltima()).toBeNull();
+
+  const historico = new Historico(join(pasta, "historico.jsonl"));
+  await historico.registrar(tentativa({ numero: 1 }));
+  expect((await historico.removerUltima())?.numero).toBe(1);
+  expect(await historico.removerUltima()).toBeNull();
+  expect(await historico.ler()).toEqual([]);
+});
+
+test("removerUltima não deixa arquivo temporário para trás", async () => {
+  const pasta = await pastaTemporaria();
+  const historico = new Historico(join(pasta, "historico.jsonl"));
+  await historico.registrar(tentativa({ numero: 1 }));
+  await historico.registrar(tentativa({ numero: 2 }));
+  await historico.removerUltima();
+  expect(await readdir(pasta)).toEqual(["historico.jsonl"]);
 });

@@ -1,4 +1,5 @@
-import { appendFile, mkdir, open, readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { appendFile, mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
 import { AREAS, IDIOMAS, LETRAS } from "../enem/tipos.js";
@@ -17,7 +18,7 @@ const esquemaDaTentativa = z.object({
 
 export type Tentativa = z.infer<typeof esquemaDaTentativa>;
 
-/** Uma tentativa por linha (JSONL). Só acrescenta: uma queda não estraga o que já foi gravado. */
+/** Uma tentativa por linha (JSONL). Registrar só acrescenta: uma queda não estraga o que já foi gravado. */
 export class Historico {
   private readonly caminho: string;
 
@@ -31,6 +32,20 @@ export class Historico {
     // sem a quebra, esta tentativa seria colada nela e as duas se perderiam.
     const prefixo = (await this.terminaComLinhaCortada()) ? "\n" : "";
     await appendFile(this.caminho, `${prefixo}${JSON.stringify(tentativa)}\n`, "utf8");
+  }
+
+  /**
+   * Desfaz o último registro e o devolve (null se não houver nenhum). É a única
+   * operação que reescreve o arquivo; por isso grava num temporário e renomeia.
+   */
+  async removerUltima(): Promise<Tentativa | null> {
+    const tentativas = await this.ler();
+    const ultima = tentativas.pop();
+    if (!ultima) return null;
+    const temporario = `${this.caminho}.${randomUUID()}.tmp`;
+    await writeFile(temporario, tentativas.map((t) => `${JSON.stringify(t)}\n`).join(""), "utf8");
+    await rename(temporario, this.caminho);
+    return ultima;
   }
 
   private async terminaComLinhaCortada(): Promise<boolean> {

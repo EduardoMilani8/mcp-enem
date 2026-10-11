@@ -20,4 +20,8 @@ Servidor MCP em TypeScript para estudar para o ENEM. Especificação em
 - Os roteiros (prompts do MCP) ficam em `src/roteiros/` e só podem citar
   ferramentas que existem; há um teste que confere isso.
 - Testes automáticos não usam a rede; usam a API falsa de `testes/apoio.ts`.
-- O plano de implementação está em `docs/plano-de-implementacao.md`.
+- `docs/plano-de-implementacao.md` é um registro histórico; a referência atual
+  é a especificação.
+- Mudança visível para quem usa entra no `CHANGELOG.md`.
+- Contribuições de fora chegam por pull request (ver `CONTRIBUTING.md`); o
+  mantenedor trabalha direto na `main`.

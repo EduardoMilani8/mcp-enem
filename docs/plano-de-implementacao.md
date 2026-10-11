@@ -1,5 +1,10 @@
 # Plano de implementação: mcp-enem (versão 1)
 
+> **Documento histórico.** Este é o plano que guiou a construção da primeira
+> versão, em outubro de 2026, e fica aqui como registro. O código mudou depois
+> dele (revisão, correções e funcionalidades novas). Para saber como o projeto
+> funciona hoje, leia a [especificação](especificacao.md).
+
 > **Para quem for executar (pessoa ou agente):** SUB-SKILL OBRIGATÓRIA: use
 > superpowers:subagent-driven-development (recomendado) ou
 > superpowers:executing-plans para implementar este plano tarefa por tarefa. Os

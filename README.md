@@ -9,7 +9,9 @@ Com o servidor conectado, você conversa normalmente:
 
 - "Me dá 5 questões de matemática do ENEM."
 - "Minha resposta é a C." (o Claude corrige e explica)
-- "Como está meu desempenho em Ciências da Natureza?"
+- "Quero questões sobre logaritmo."
+- "Me explica a questão 95 de 2023, sem contar como tentativa."
+- "Como está meu desempenho em Química?"
 - "Quero refazer as questões que eu errei."
 
 ## Instalação
@@ -55,11 +57,25 @@ Reinicie o Claude Desktop.
 | Ferramenta | O que faz |
 |---|---|
 | `listar_provas` | Anos, áreas e idiomas disponíveis |
-| `buscar_questoes` | Sorteia questões por ano e área, sem o gabarito |
+| `buscar_questoes` | Sorteia questões por ano, área e palavras-chave, sem o gabarito |
 | `obter_questao` | Uma questão específica, pelo ano e número |
-| `corrigir_resposta` | Confere a resposta, revela o gabarito e grava no histórico |
-| `ver_desempenho` | Acertos e erros no geral, nos últimos 7 dias e por área |
+| `corrigir_resposta` | Confere a resposta, revela o gabarito e grava no histórico, com a matéria e o assunto |
+| `ver_gabarito` | Mostra a resposta certa sem gravar nada |
+| `desfazer_ultima_tentativa` | Remove do histórico o último registro |
+| `ver_desempenho` | Acertos e erros no geral, nos últimos 7 dias, por área, por matéria e por assunto |
 | `revisar_erros` | Questões que você errou, para refazer |
+
+## Roteiros prontos
+
+O servidor também traz quatro roteiros de estudo. No Claude Code eles aparecem
+como comandos ao digitar `/`; no Claude Desktop, no menu de anexos.
+
+| Roteiro | O que faz |
+|---|---|
+| `simulado_rapido` | Simulado curto, com correção só no final |
+| `revisao_dos_erros` | Refaz, uma por uma, as questões que você errou |
+| `estudar_assunto` | Resumo de um assunto e questões sobre ele |
+| `como_estou` | Diagnóstico do seu histórico e plano para a semana |
 
 ## Seus dados
 
@@ -69,12 +85,17 @@ Tudo fica na sua máquina, em `~/.mcp-enem/`:
 - `historico.jsonl`: suas respostas, uma por linha.
 
 Para usar outra pasta, defina a variável de ambiente `MCP_ENEM_DIR`. Para
-zerar o histórico, apague o arquivo `historico.jsonl`.
+zerar o histórico, apague o arquivo `historico.jsonl`; para tirar só o último
+registro, peça ao Claude para desfazer a última tentativa.
 
 ## Limitações
 
 - Provas de 2009 a 2023 (é o que a fonte de dados tem hoje).
-- O desempenho é por área do conhecimento, não por matéria.
+- A fonte de dados só separa as questões nas quatro grandes áreas. A matéria e
+  o assunto são identificados pelo Claude na hora da correção, então só existem
+  para as questões que você já respondeu.
+- A busca por assunto procura palavras no texto da questão, não o tema: uma
+  questão de logaritmo que não usa a palavra não é encontrada.
 - Questões anuladas e questões com imagem quebrada na fonte não aparecem.
 - A primeira vez que você usa um ano de prova leva uns 5 segundos, porque a
   prova inteira é baixada; depois disso é instantâneo e funciona sem internet.

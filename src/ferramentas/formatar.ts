@@ -1,4 +1,11 @@
-import { AREAS, NOMES_DAS_AREAS, type Idioma, type QuestaoPublica } from "../enem/tipos.js";
+import {
+  AREAS,
+  MATERIAS,
+  NOMES_DAS_AREAS,
+  NOMES_DAS_MATERIAS,
+  type Idioma,
+  type QuestaoPublica,
+} from "../enem/tipos.js";
 import type { Desempenho, Placar } from "../historico/estatisticas.js";
 
 export const NOMES_DOS_IDIOMAS: Record<Idioma, string> = { ingles: "inglês", espanhol: "espanhol" };
@@ -33,6 +40,24 @@ export function formatarDesempenho(desempenho: Desempenho): string {
   for (const area of AREAS) {
     const placar = desempenho.porArea[area];
     if (placar) linhas.push(linha(NOMES_DAS_AREAS[area], placar));
+  }
+
+  // As matérias seguem a ordem das provas (a mesma de MATERIAS), não a alfabética.
+  const materias = MATERIAS.filter((materia) => desempenho.porMateria[materia]);
+  if (materias.length > 0) {
+    linhas.push("", "### Por matéria");
+    for (const materia of materias) {
+      const placar = desempenho.porMateria[materia];
+      if (placar) linhas.push(linha(NOMES_DAS_MATERIAS[materia], placar));
+    }
+    if (desempenho.semMateria > 0) linhas.push(`- (${desempenho.semMateria} tentativa(s) sem matéria registrada)`);
+  }
+
+  if (desempenho.assuntosComMaisErros.length > 0) {
+    linhas.push("", "### Assuntos com mais erros");
+    for (const { assunto, erros, total } of desempenho.assuntosComMaisErros) {
+      linhas.push(`- ${assunto}: ${erros} erro(s) em ${total} tentativa(s)`);
+    }
   }
   return linhas.join("\n");
 }

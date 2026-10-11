@@ -1,6 +1,6 @@
 {
   "name": "mcp-enem",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Servidor MCP para estudar para o ENEM: questões reais, correção com gabarito oficial e acompanhamento de desempenho.",
   "type": "module",
   "bin": {

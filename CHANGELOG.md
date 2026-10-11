@@ -3,6 +3,17 @@
 As mudanças que importam para quem usa o mcp-enem, da mais recente para a mais
 antiga.
 
+## 0.1.1 (11/10/2026)
+
+Nenhuma mudança no funcionamento do servidor.
+
+- README reescrito para quem nunca usou um servidor MCP: instalação em três
+  passos, exemplos do que pedir, perguntas frequentes e solução de problemas.
+- A instalação recomendada passa a usar `mcp-enem@latest`, que busca a versão
+  mais recente sempre que o Claude inicia.
+- O servidor se identifica nas requisições à enem.dev com o nome, a versão e o
+  endereço do projeto.
+
 ## 0.1.0 (11/10/2026)
 
 Primeira versão pública.

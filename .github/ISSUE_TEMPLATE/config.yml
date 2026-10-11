@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Dúvida sobre como instalar ou usar
+    url: https://github.com/EduardoMilani8/mcp-enem#instalação
+    about: O README explica a instalação, as ferramentas e os roteiros.
+  - name: Problema na API de questões (enem.dev)
+    url: https://github.com/yunger7/enem-api/issues
+    about: Se a API estiver fora do ar ou com dados errados, o lugar certo é o projeto de origem.

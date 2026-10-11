@@ -1,0 +1,47 @@
+name: Sugerir uma melhoria
+description: Uma funcionalidade nova ou uma mudança no jeito que algo funciona.
+title: "[Sugestão] "
+labels: ["melhoria"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de sugerir, vale olhar a lista do que já está planejado e do que foi deixado de fora de propósito, na seção "Fora do escopo" da [especificação](https://github.com/EduardoMilani8/mcp-enem/blob/main/docs/especificacao.md).
+  - type: textarea
+    id: problema
+    attributes:
+      label: Que problema isso resolve?
+      description: Conte a situação de estudo em que você sentiu falta. O problema importa mais que a solução.
+      placeholder: Quero estudar só Química, mas o servidor só sabe a matéria das questões que já respondi.
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: O que você propõe?
+      description: Como você imagina que funcionaria. Um exemplo de pedido ao Claude ajuda muito.
+    validations:
+      required: true
+  - type: dropdown
+    id: precisa-do-servidor
+    attributes:
+      label: O Claude já consegue fazer isso sozinho, sem o servidor?
+      description: |
+        O servidor só vale a pena onde o Claude não alcança: dados que ele não tem (as questões oficiais, o seu histórico) e ações que ele não pode fazer (gravar, apagar). Explicar matéria ou montar um plano de estudo, por exemplo, ele já faz.
+      options:
+        - Não, precisa de dados ou de uma ação que só o servidor tem
+        - Em parte
+        - Sim, mas ficaria melhor com o servidor
+        - Não sei
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas que você considerou
+  - type: checkboxes
+    id: contribuir
+    attributes:
+      label: Você gostaria de implementar?
+      options:
+        - label: Posso abrir um pull request para isso.

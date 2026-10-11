@@ -1,0 +1,96 @@
+name: Relatar um problema
+description: Algo não funcionou como deveria (erro, travamento, resposta estranha do servidor).
+title: "[Problema] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por avisar! Quanto mais concreto o relato, mais rápido dá para reproduzir e corrigir.
+
+        Se o problema é no **conteúdo de uma questão** (gabarito errado, imagem faltando, texto cortado), use o formulário "Questão com erro".
+  - type: textarea
+    id: o-que-aconteceu
+    attributes:
+      label: O que aconteceu?
+      description: Descreva o que você viu. Se houve mensagem de erro, cole o texto exato.
+      placeholder: Pedi 5 questões de matemática e o Claude respondeu "Ocorreu um erro inesperado no mcp-enem".
+    validations:
+      required: true
+  - type: textarea
+    id: o-que-esperava
+    attributes:
+      label: O que você esperava que acontecesse?
+    validations:
+      required: true
+  - type: textarea
+    id: como-reproduzir
+    attributes:
+      label: Como reproduzir
+      description: O que você pediu ao Claude, na ordem. Se souber, diga o ano e o número da questão.
+      placeholder: |
+        1. Abri uma conversa nova
+        2. Pedi "me dá 3 questões de linguagens do ENEM 2015"
+        3. Respondi "A" na primeira
+    validations:
+      required: true
+  - type: dropdown
+    id: onde
+    attributes:
+      label: Onde o problema aparece?
+      options:
+        - Não sei
+        - Instalação ou conexão do servidor
+        - buscar_questoes
+        - obter_questao
+        - corrigir_resposta
+        - ver_gabarito
+        - desfazer_ultima_tentativa
+        - ver_desempenho
+        - revisar_erros
+        - listar_provas
+        - Roteiros (simulado_rapido, revisao_dos_erros, estudar_assunto, como_estou)
+        - Imagens das questões
+    validations:
+      required: true
+  - type: dropdown
+    id: cliente
+    attributes:
+      label: Qual cliente você usa?
+      options:
+        - Claude Code
+        - Claude Desktop
+        - Outro (diga qual na descrição)
+    validations:
+      required: true
+  - type: input
+    id: versao
+    attributes:
+      label: Versão do mcp-enem
+      description: Aparece no arquivo package.json, ou rode `npm view mcp-enem version`.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: ambiente
+    attributes:
+      label: Sistema operacional e versão do Node.js
+      description: A versão do Node sai com `node --version`.
+      placeholder: Ubuntu 24.04, Node 22.12
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log do servidor (se tiver)
+      description: As linhas que começam com "[mcp-enem]". Confira se não há dados pessoais antes de colar.
+      render: text
+  - type: checkboxes
+    id: conferi
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Procurei nas issues abertas e não achei este problema.
+          required: true
+        - label: O problema acontece numa conversa nova (o servidor só é carregado quando a conversa começa).
+          required: true

@@ -1,0 +1,57 @@
+name: Questão com erro
+description: O conteúdo de uma questão está errado (gabarito, imagem, texto, alternativa).
+title: "[Questão] ENEM AAAA, questão NN: "
+labels: ["dados"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        As questões vêm do projeto [enem.dev](https://enem.dev); o mcp-enem não guarda nem edita o conteúdo delas. Erros de conteúdo precisam ser corrigidos lá.
+
+        Mesmo assim, vale registrar aqui: dá para conferir se o problema é da fonte ou do mcp-enem, e encaminhar.
+  - type: input
+    id: ano
+    attributes:
+      label: Ano da prova
+      placeholder: "2023"
+    validations:
+      required: true
+  - type: input
+    id: numero
+    attributes:
+      label: Número da questão
+      placeholder: "95"
+    validations:
+      required: true
+  - type: dropdown
+    id: idioma
+    attributes:
+      label: Idioma (só para questões de língua estrangeira)
+      options:
+        - Não é de língua estrangeira
+        - Inglês
+        - Espanhol
+    validations:
+      required: true
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: O que está errado?
+      multiple: true
+      options:
+        - O gabarito não bate com o oficial do INEP
+        - Falta uma imagem ou ela não abre
+        - O texto está cortado ou embaralhado
+        - Falta uma alternativa ou ela veio vazia
+        - A questão é de outra área
+        - A questão foi anulada e aparece mesmo assim
+        - Outro
+    validations:
+      required: true
+  - type: textarea
+    id: detalhes
+    attributes:
+      label: Detalhes
+      description: O que o servidor mostrou e o que deveria ser. Se for o gabarito, diga qual é o oficial e, se possível, de onde tirou.
+    validations:
+      required: true

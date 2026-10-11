@@ -1,5 +1,7 @@
 # mcp-enem
 
+[![Verificar](https://github.com/EduardoMilani8/mcp-enem/actions/workflows/verificar.yml/badge.svg)](https://github.com/EduardoMilani8/mcp-enem/actions/workflows/verificar.yml)
+
 Servidor MCP para estudar para o ENEM com o Claude: questões reais da prova,
 correção com gabarito oficial e acompanhamento do seu desempenho.
 
@@ -51,6 +53,9 @@ Em Configurações → Desenvolvedor → Editar configuração, acrescente:
 ```
 
 Reinicie o Claude Desktop.
+
+O servidor só é carregado quando a conversa começa: depois de instalar, abra
+uma conversa nova. Para remover do Claude Code, use `claude mcp remove mcp-enem`.
 
 ## Ferramentas
 
@@ -109,7 +114,16 @@ npm run verificar
 npm run build
 ```
 
-A arquitetura está em [docs/especificacao.md](docs/especificacao.md).
+Os testes pedem o Node.js 22.12 ou superior; o servidor em si roda a partir do
+Node 20. A arquitetura está em [docs/especificacao.md](docs/especificacao.md)
+e as mudanças de cada versão em [CHANGELOG.md](CHANGELOG.md).
+
+## Contribuir
+
+Achou um problema, uma questão com erro, ou tem uma ideia? Abra uma
+[issue](https://github.com/EduardoMilani8/mcp-enem/issues/new/choose): há um
+formulário para cada caso. Para enviar código, veja o
+[guia de contribuição](CONTRIBUTING.md).
 
 ## Créditos
 
